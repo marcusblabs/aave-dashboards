@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Aave v4 Tokenization Spoke Caps</title>
+<style>
+  :root {
+    --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+
+    /* cool-neutral ground, picked with a faint indigo bias */
+    --bg: #f4f5f8;
+    --surface: #ffffff;
+    --surface-2: #eef0f4;
+    --border: #dfe2ea;
+    --border-strong: #cbd0dc;
+    --ink: #1b1e27;
+    --muted: #626878;
+    --faint: #8b91a1;
+
+    --accent: #4f46e5;      /* indigo, interactive only */
+    --accent-ink: #ffffff;
+
+    /* semantic fill bands — distinct from the accent */
+    --open: #0f9d8c;        /* teal = headroom */
+    --open-bg: #d8f3ee;
+    --filling: #c77400;     /* amber = filling up */
+    --filling-bg: #faedd2;
+    --full: #d23b3b;        /* red = at cap */
+    --full-bg: #fadedd;
+    --off: #9aa0b0;         /* disabled */
+    --off-bg: #eceef2;
+
+    --eth: #6572e6;
+    --avax: #e84142;
+
+    --track: #e7e9f0;
+    --shadow: 0 1px 2px rgba(20,24,40,.05), 0 1px 1px rgba(20,24,40,.04);
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0c0e13;
+      --surface: #14171e;
+      --surface-2: #1a1e27;
+      --border: #262b36;
+      --border-strong: #333a48;
+      --ink: #e7e9ee;
+      --muted: #9198a8;
+      --faint: #6b7182;
+      --accent: #7c78f0;
+      --accent-ink: #0c0e13;
+      --open: #34d4bf; --open-bg: #0e2b28;
+      --filling: #f0a83a; --filling-bg: #2e2413;
+      --full: #f26d6d; --full-bg: #2e1717;
+      --off: #565d6e; --off-bg: #1b1f28;
+      --eth: #8a95f5;
+      --avax: #ff5a5b;
+      --track: #232833;
+      --shadow: 0 1px 2px rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f5f8; --surface: #ffffff; --surface-2: #eef0f4; --border: #dfe2ea;
+    --border-strong: #cbd0dc; --ink: #1b1e27; --muted: #626878; --faint: #8b91a1;
+    --accent: #4f46e5; --accent-ink: #ffffff;
+    --open: #0f9d8c; --open-bg: #d8f3ee; --filling: #c77400; --filling-bg: #faedd2;
+    --full: #d23b3b; --full-bg: #fadedd; --off: #9aa0b0; --off-bg: #eceef2;
+    --eth: #6572e6; --avax: #e84142; --track: #e7e9f0; --shadow: 0 1px 2px rgba(20,24,40,.05);
+  }
+  :root[data-theme="dark"] {
+    --bg: #0c0e13; --surface: #14171e; --surface-2: #1a1e27; --border: #262b36;
+    --border-strong: #333a48; --ink: #e7e9ee; --muted: #9198a8; --faint: #6b7182;
+    --accent: #7c78f0; --accent-ink: #0c0e13;
+    --open: #34d4bf; --open-bg: #0e2b28; --filling: #f0a83a; --filling-bg: #2e2413;
+    --full: #f26d6d; --full-bg: #2e1717; --off: #565d6e; --off-bg: #1b1f28;
+    --eth: #8a95f5; --avax: #ff5a5b; --track: #232833; --shadow: 0 1px 2px rgba(0,0,0,.4);
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 15px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 32px 24px 64px; }
+
+  /* header */
+  header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 28px; }
+  .titles h1 { font-size: 22px; font-weight: 650; letter-spacing: -.01em; margin: 0 0 4px; text-wrap: balance; }
+  .titles p { margin: 0; color: var(--muted); font-size: 13.5px; }
+  .titles p b { color: var(--ink); font-weight: 600; }
+
+  .controls { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+  button.refresh {
+    font-family: var(--font-sans); font-size: 14px; font-weight: 600;
+    color: var(--accent-ink); background: var(--accent);
+    border: none; border-radius: 8px; padding: 10px 18px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 9px;
+    transition: filter .15s ease, opacity .15s ease;
+  }
+  button.refresh:hover { filter: brightness(1.07); }
+  button.refresh:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button.refresh:disabled { opacity: .6; cursor: progress; }
+  .spinner { width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; display: none; }
+  button.refresh.loading .spinner { display: inline-block; animation: spin .7s linear infinite; }
+  button.refresh.loading .lbl-idle { display: none; }
+  .lbl-load { display: none; }
+  button.refresh.loading .lbl-load { display: inline; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .status { font-family: var(--font-mono); font-size: 11.5px; color: var(--faint); text-align: right; }
+  .status .dot { color: var(--open); }
+
+  /* summary strip */
+  .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 30px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); }
+  .stat .k { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 7px; }
+  .stat .v { font-family: var(--font-mono); font-size: 21px; font-weight: 600; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+  .stat .sub { font-size: 12px; color: var(--faint); margin-top: 3px; }
+  .stat .v.warn { color: var(--full); }
+
+  /* chain section */
+  .chain { margin-bottom: 34px; }
+  .chain-head { display: flex; align-items: center; gap: 10px; margin: 0 2px 12px; }
+  .mark { width: 11px; height: 11px; flex: none; }
+  .mark.eth { background: var(--eth); transform: rotate(45deg); border-radius: 2px; }
+  .mark.avax { width: 0; height: 0; background: none; border-left: 7px solid transparent; border-right: 7px solid transparent; border-bottom: 12px solid var(--avax); }
+  .chain-head h2 { font-size: 15px; font-weight: 650; margin: 0; }
+  .chain-head .meta { font-family: var(--font-mono); font-size: 11.5px; color: var(--faint); margin-left: auto; text-align: right; }
+
+  .rows { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+  .row { display: grid; grid-template-columns: 148px 1fr 132px 96px; align-items: center; gap: 16px; padding: 13px 18px; border-top: 1px solid var(--border); }
+  .row:first-child { border-top: none; }
+  .row .name { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .row .sym { font-weight: 600; font-size: 14px; }
+  .row .addr { font-family: var(--font-mono); font-size: 10.5px; color: var(--faint); cursor: pointer; width: fit-content; }
+  .row .addr:hover { color: var(--accent); }
+
+  .barcell { min-width: 0; }
+  .bar { position: relative; height: 22px; background: var(--track); border-radius: 5px; overflow: hidden; }
+  .bar .fill { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: 5px 0 0 5px; transition: width .6s cubic-bezier(.4,0,.2,1); }
+  .fill.open { background: var(--open); } .fill.filling { background: var(--filling); } .fill.full { background: var(--full); }
+  .bar .pct { position: absolute; right: 8px; top: 0; height: 100%; display: flex; align-items: center; font-family: var(--font-mono); font-size: 11px; font-variant-numeric: tabular-nums; color: var(--muted); }
+
+  .nums { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .nums .supplied { font-size: 13px; font-weight: 600; }
+  .nums .cap { font-size: 11px; color: var(--faint); }
+  .nums .avail { font-size: 12px; }
+  .nums .avail b { font-weight: 600; }
+
+  .pill { justify-self: end; font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+  .pill.open { color: var(--open); background: var(--open-bg); }
+  .pill.filling { color: var(--filling); background: var(--filling-bg); }
+  .pill.full { color: var(--full); background: var(--full-bg); }
+  .pill.err { color: var(--full); background: var(--full-bg); }
+
+  /* disabled block */
+  .disabled { padding: 12px 18px; border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; align-items: center; gap: 8px; background: var(--surface-2); }
+  .disabled .lab { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); margin-right: 4px; }
+  .chip { font-family: var(--font-mono); font-size: 11px; color: var(--off); background: var(--off-bg); border: 1px solid var(--border); padding: 2px 8px; border-radius: 6px; }
+
+  footer { margin-top: 34px; color: var(--faint); font-size: 12px; line-height: 1.6; }
+  footer code { font-family: var(--font-mono); font-size: 11px; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+  a { color: var(--accent); }
+
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--ink); color: var(--bg); font-size: 13px; padding: 8px 16px; border-radius: 8px; opacity: 0; pointer-events: none; transition: all .2s ease; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 720px) {
+    .summary { grid-template-columns: repeat(2, 1fr); }
+    .row { grid-template-columns: 1fr 108px; grid-template-areas: "name pill" "bar bar" "nums nums"; gap: 10px; }
+    .row .name { grid-area: name; } .barcell { grid-area: bar; } .nums { grid-area: nums; text-align: left; } .pill { grid-area: pill; }
+    header { flex-direction: column; align-items: stretch; } .controls { align-items: stretch; } .status { text-align: left; }
+  }
+  @media (prefers-reduced-motion: reduce) { .bar .fill { transition: none; } .spinner { animation-duration: 2s; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="titles">
+      <a href="../" style="font-size:12px;color:var(--muted);text-decoration:none;display:inline-block;margin-bottom:6px">&larr; Aave Dashboards</a>
+      <h1>Aave v4 Tokenization Spoke Caps</h1>
+      <p>Live deposit-cap headroom on the <b>waCore*</b> ERC-4626 wrappers &middot; Ethereum &amp; Avalanche Core Hubs</p>
+    </div>
+    <div class="controls">
+      <button class="refresh" id="refresh" type="button">
+        <span class="spinner" aria-hidden="true"></span>
+        <span class="lbl-idle">Refresh from chain</span>
+        <span class="lbl-load">Reading chains&hellip;</span>
+      </button>
+      <div class="status" id="status">Loading&hellip;</div>
+    </div>
+  </header>
+
+  <section class="summary" id="summary"></section>
+  <div id="chains"></div>
+
+  <footer>
+    Reads <code>getSpokeConfig</code>, <code>totalAssets</code> and <code>maxDeposit</code> directly from each Core Hub over public RPC.
+    Caps are governance-set per spoke; <b>available</b> is the room left before the cap. Figures in native token units
+    (stablecoins &asymp; $1; AVAX / BTC / ETH are not). Nothing here is financial advice.
+    Click any address to copy. Spoke set embedded from a hub scan on 2026-07-15 &mdash; regenerate with <code>aave_v4_spoke_caps.py</code>.
+  </footer>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const HUBS = {
+  ethereum:  { hub: "0xCca852Bc40e560adC3b1Cc58CA5b55638ce826c9", explorer: "https://etherscan.io/address/",
+               rpcs: ["https://ethereum-rpc.publicnode.com", "https://eth.drpc.org"], mark: "eth", label: "Ethereum" },
+  avalanche: { hub: "0xd07369fAE4A5BB13c9Ce446B052c7867B1AbDf6e", explorer: "https://snowscan.xyz/address/",
+               rpcs: ["https://api.avax.network/ext/bc/C/rpc", "https://avalanche-c-chain-rpc.publicnode.com"], mark: "avax", label: "Avalanche" },
+};
+const SPOKES = {
+  ethereum: [
+    {symbol:"waCoreUSDC",spoke:"0x531e90a2376902de8915789fcc1075e3b0c153e7",assetId:5,decimals:6},
+    {symbol:"waCoreUSDT",spoke:"0x5ec44a70f309854fe04d495cfe1b5da63dd1cc73",assetId:4,decimals:6},
+    {symbol:"waCoreGHO",spoke:"0x58c14a5e061c9bc6926c5b853445290f296c2f7b",assetId:6,decimals:18},
+    {symbol:"waCoreRLUSD",spoke:"0xc8a125ae4275a78aadc53b46ca10566bc9b249e0",assetId:7,decimals:18},
+    {symbol:"waCoreUSDG",spoke:"0xac2435e3c25e8246870d33ce0a26988a46d5db68",assetId:8,decimals:6},
+    {symbol:"waCorefrxUSD",spoke:"0x2226749630775ee20230ad65214fb339087ef30d",assetId:9,decimals:18},
+    {symbol:"waCoreEURC",spoke:"0x6d9e2cdd61caf69af99b275704b6e272c41c6718",assetId:10,decimals:6},
+    {symbol:"waCoreWETH",spoke:"0x7320cf22ac095ba2a2e0a652f77efb836c2e751b",assetId:0,decimals:18},
+    {symbol:"waCoreAAVE",spoke:"0x0a65197b16c5969f92672051c9c9c0c75b369135",assetId:15,decimals:18},
+    {symbol:"waCoreLBTC",spoke:"0x7961f140b570490849db878ae222570ea838799d",assetId:13,decimals:8},
+    {symbol:"waCoreLINK",spoke:"0xe69c2045095c8ab3e2a7d77de2328fae5baf797c",assetId:16,decimals:18},
+    {symbol:"waCoreWBTC",spoke:"0x82a9cc4656784e55ef2e78f704028b5e1bfc1732",assetId:11,decimals:8},
+    {symbol:"waCoreXAUt",spoke:"0x4e712562fcb5337011398b6c630f55b60641cd5e",assetId:14,decimals:6},
+    {symbol:"waCorecbBTC",spoke:"0x33b41b74366f55327d959fff6d6b6fbc2853dbb1",assetId:12,decimals:8},
+    {symbol:"waCorersETH",spoke:"0x45a04ca1a5cbeea4b44356c75edd29b33eb2527a",assetId:3,decimals:18},
+    {symbol:"waCoreweETH",spoke:"0x559cec2c840d9dbb18936afc5e5341d78bfc7cbe",assetId:2,decimals:18},
+    {symbol:"waCorewstETH",spoke:"0xcb0e7da9c635628f6d4827355aeca75ab8d3560f",assetId:1,decimals:18},
+  ],
+  avalanche: [
+    {symbol:"waCoreUSDC",spoke:"0x01d7f7b7ce2123192fecc20bd1caf3e4d9e4c10d",assetId:2,decimals:6},
+    {symbol:"waCoreUSDT",spoke:"0x2e4ba06ff97e10d09fa4f5a270e97301eae729a9",assetId:3,decimals:6},
+    {symbol:"waCoreEURC",spoke:"0x7b538a1840eaf2ed92eeb67ee744ae627335e201",assetId:5,decimals:6},
+    {symbol:"waCoreWAVAX",spoke:"0x1604d602f8a05cba2d8ff5d14de4c3498f15b6b4",assetId:0,decimals:18},
+    {symbol:"waCoreWETHe",spoke:"0xf5c849468318c8d5670020fdb96ae135fed37070",assetId:4,decimals:18},
+    {symbol:"waCoreBTCb",spoke:"0x7cd3ccc737f442050a861ec6b00768ae96b2f58e",assetId:1,decimals:8},
+    {symbol:"waCoresAVAX",spoke:"0x6c27a7435040b7cc512319d5690beef234dfe76e",assetId:6,decimals:18},
+  ],
+};
+const STABLES = new Set(["waCoreUSDC","waCoreUSDT","waCoreUSDG","waCoreGHO","waCorefrxUSD","waCoreRLUSD","waCoreUSDt"]);
+const SEL = { config: "0xf701f06e", totalAssets: "0x01e1d114", maxDeposit: "0x402d267d" };
+const DEAD = "000000000000000000000000000000000000000000000000000000000000dead";
+const MAX_CAP = (1n << 40n) - 1n;
+
+const u256 = n => BigInt(n).toString(16).padStart(64, "0");
+const addr = a => a.toLowerCase().replace("0x","").padStart(64, "0");
+
+async function rpc(rpcs, method, params) {
+  let err;
+  for (const url of rpcs) {
+    try {
+      const r = await fetch(url, { method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ jsonrpc:"2.0", id:1, method, params }) });
+      const j = await r.json();
+      if (j.result !== undefined) return j.result;
+      err = j.error && j.error.message;
+    } catch (e) { err = String(e); }
+  }
+  throw new Error(err || "rpc failed");
+}
+const ethCall = (rpcs, to, data) => rpc(rpcs, "eth_call", [{ to, data }, "latest"]);
+
+function fmt(x, dp) {
+  if (x === null) return "-";
+  const opts = x >= 1000 || x === Math.floor(x)
+    ? { maximumFractionDigits: 0 }
+    : { maximumFractionDigits: dp <= 6 ? 2 : 4 };
+  return x.toLocaleString("en-US", opts);
+}
+function band(pct) { return pct >= 90 ? "full" : pct >= 40 ? "filling" : "open"; }
+
+async function readSpoke(chain, s) {
+  const { hub, rpcs } = HUBS[chain];
+  const [cfg, ta, md] = await Promise.all([
+    ethCall(rpcs, hub, SEL.config + u256(s.assetId) + addr(s.spoke)),
+    ethCall(rpcs, s.spoke, SEL.totalAssets).catch(() => "0x0"),
+    ethCall(rpcs, s.spoke, SEL.maxDeposit + DEAD).catch(() => "0x0"),
+  ]);
+  const w = i => BigInt("0x" + cfg.slice(2 + i*64, 2 + (i+1)*64));
+  const addCap = w(0), active = w(3) === 1n, halted = w(4) === 1n;
+  const unit = 10 ** s.decimals;
+  const supplied = Number(BigInt(ta)) / unit;
+  const available = Number(BigInt(md)) / unit;
+  const uncapped = addCap === MAX_CAP;
+  const capTokens = uncapped ? null : Number(addCap);
+  const disabled = addCap === 0n;
+  const pct = (capTokens && capTokens > 0) ? Math.min(100, 100 * supplied / capTokens) : null;
+  return { ...s, chain, addCap: capTokens, supplied, available, pct, active, halted, uncapped, disabled };
+}
+
+async function readChain(chain) {
+  const { rpcs } = HUBS[chain];
+  const [blockHex, rows] = await Promise.all([
+    rpc(rpcs, "eth_blockNumber", []),
+    Promise.all(SPOKES[chain].map(s => readSpoke(chain, s).catch(e => ({ ...s, chain, error: String(e.message||e) })))),
+  ]);
+  return { block: parseInt(blockHex, 16), rows };
+}
+
+function statusText(r) {
+  if (r.error) return { cls:"err", txt:"read error" };
+  if (r.disabled) return { cls:"", txt:"disabled" };
+  if (r.halted) return { cls:"full", txt:"halted" };
+  if (!r.active) return { cls:"filling", txt:"inactive" };
+  const b = band(r.pct);
+  return { cls:b, txt: b === "full" ? "at cap" : b === "filling" ? "filling" : "open" };
+}
+
+function rowHTML(r) {
+  const ex = HUBS[r.chain].explorer + r.spoke;
+  const short = r.spoke.slice(0,6) + "…" + r.spoke.slice(-4);
+  const st = statusText(r);
+  if (r.error) {
+    return `<div class="row"><div class="name"><span class="sym">${r.symbol}</span>
+      <span class="addr" data-a="${r.spoke}" title="${r.spoke}">${short}</span></div>
+      <div class="barcell"><div class="bar"></div></div>
+      <div class="nums"><div class="cap">${r.error}</div></div>
+      <span class="pill err">error</span></div>`;
+  }
+  const b = band(r.pct || 0);
+  const pctTxt = r.pct === null ? "" : (r.pct >= 99.9 && r.pct < 100 ? "99.99%" : r.pct.toFixed(r.pct < 10 ? 2 : 1) + "%");
+  const bar = r.disabled
+    ? `<div class="bar"></div>`
+    : `<div class="bar"><div class="fill ${b}" style="width:${(r.pct||0).toFixed(2)}%"></div><span class="pct">${pctTxt}</span></div>`;
+  const capTxt = r.uncapped ? "uncapped" : "cap " + fmt(r.addCap, r.decimals);
+  return `<div class="row">
+    <div class="name"><span class="sym">${r.symbol}</span>
+      <span class="addr" data-a="${r.spoke}" title="click to copy — ${r.spoke}">${short}</span></div>
+    <div class="barcell">${bar}</div>
+    <div class="nums">
+      <div class="supplied">${fmt(r.supplied, r.decimals)}</div>
+      <div class="cap">${capTxt}</div>
+      <div class="avail">avail <b>${fmt(r.available, r.decimals)}</b></div>
+    </div>
+    <span class="pill ${st.cls}">${st.txt}</span>
+  </div>`;
+}
+
+function chainHTML(chain, data) {
+  const { label, mark } = HUBS[chain];
+  const active = data.rows.filter(r => r.error || !r.disabled);
+  const disabled = data.rows.filter(r => !r.error && r.disabled);
+  active.sort((a,b) => (b.addCap||0) - (a.addCap||0) || (b.supplied - a.supplied));
+  const disabledHTML = disabled.length
+    ? `<div class="disabled"><span class="lab">Disabled &middot; cap 0</span>${disabled.map(r => `<span class="chip">${r.symbol}</span>`).join("")}</div>`
+    : "";
+  return `<section class="chain">
+    <div class="chain-head"><span class="mark ${mark}"></span><h2>${label}</h2>
+      <span class="meta">block ${data.block.toLocaleString()} &middot; ${active.length} live &middot; ${disabled.length} off</span></div>
+    <div class="rows">${active.map(rowHTML).join("")}${disabledHTML}</div>
+  </section>`;
+}
+
+function summaryHTML(all) {
+  const rows = [].concat(...Object.values(all).map(d => d.rows)).filter(r => !r.error);
+  const live = rows.filter(r => !r.disabled && r.active && !r.halted);
+  const stableAvail = live.filter(r => STABLES.has(r.symbol)).reduce((a,r) => a + r.available, 0);
+  const fullest = live.filter(r => r.pct !== null).sort((a,b) => b.pct - a.pct)[0];
+  const capped = live.filter(r => r.pct !== null);
+  const totalCapUsed = capped.reduce((a,r) => a + r.pct, 0) / (capped.length || 1);
+  const fEmoji = fullest ? (fullest.pct >= 99.9 ? "99.99%" : fullest.pct.toFixed(1) + "%") : "-";
+  return `
+    <div class="stat"><div class="k">Live wrappers</div><div class="v">${live.length}</div>
+      <div class="sub">across Ethereum + Avalanche</div></div>
+    <div class="stat"><div class="k">Stablecoin headroom</div><div class="v">$${fmt(stableAvail, 0)}</div>
+      <div class="sub">room left on $-pegged wrappers</div></div>
+    <div class="stat"><div class="k">Fullest wrapper</div><div class="v ${fullest && fullest.pct>=90?'warn':''}">${fEmoji}</div>
+      <div class="sub">${fullest ? fullest.symbol + " · " + HUBS[fullest.chain].label : "-"}</div></div>
+    <div class="stat"><div class="k">Avg fill (capped)</div><div class="v">${totalCapUsed.toFixed(1)}%</div>
+      <div class="sub">${capped.length} capped wrappers</div></div>`;
+}
+
+let toastTimer;
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove("show"), 1400);
+}
+document.addEventListener("click", e => {
+  const a = e.target.closest(".addr");
+  if (a) { navigator.clipboard.writeText(a.dataset.a).then(() => toast("Address copied")).catch(()=>{}); }
+});
+
+const btn = document.getElementById("refresh");
+async function refresh() {
+  btn.classList.add("loading"); btn.disabled = true;
+  document.getElementById("status").textContent = "Reading Ethereum + Avalanche…";
+  try {
+    const entries = await Promise.all(Object.keys(HUBS).map(async c => [c, await readChain(c)]));
+    const all = Object.fromEntries(entries);
+    document.getElementById("summary").innerHTML = summaryHTML(all);
+    document.getElementById("chains").innerHTML = Object.keys(HUBS).map(c => chainHTML(c, all[c])).join("");
+    const now = new Date().toLocaleTimeString("en-US", { hour12:false });
+    const blocks = Object.entries(all).map(([c,d]) => `${HUBS[c].label} ${d.block.toLocaleString()}`).join(" · ");
+    document.getElementById("status").innerHTML = `<span class="dot">●</span> ${blocks} · updated ${now}`;
+  } catch (e) {
+    document.getElementById("status").textContent = "Failed: " + (e.message || e);
+  } finally {
+    btn.classList.remove("loading"); btn.disabled = false;
+  }
+}
+btn.addEventListener("click", refresh);
+refresh();
+</script>
+</body>
+</html>
