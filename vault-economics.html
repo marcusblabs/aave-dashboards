@@ -946,6 +946,7 @@ const SNAPSIGN={tear:Object.fromEntries(ORDER.map(id=>[id,V[id].maxLev>=0])),gho
 const FEECOMP={btc:0.38,eth:0.03};            // Fluid comparable pool fees (%/side); refreshed from live v51/v44
 const LASTINC={usdg:6.20,frx:5.36,susde:3.75,weth:0.77}; // last known Merkl APRs (snapshot defaults)
 let FLIPS=[];
+let merklRetry=false;
 const num=x=>x==null?0:parseFloat(x);
 const sgn=(x,dp)=>(x<0?"−":"+")+Math.abs(x).toFixed(dp);
 
@@ -1217,7 +1218,24 @@ async function refresh(){
   if(mk.status==="fulfilled"&&Array.isArray(mk.value)){
     try{ rebuildMerkl(mk.value); SRC.merkl={state:"live",at:t}; }
     catch(e){ if(SRC.merkl.state==="live")SRC.merkl.state="stale"; console.warn("merkl parse failed, kept last:",e); }
-  } else if(SRC.merkl.state==="live") SRC.merkl.state="stale";
+  } else {
+    if(SRC.merkl.state==="live") SRC.merkl.state="stale";
+    /* Merkl rate-limits bursts (429, surfaces as a CORS error): one polite deferred retry */
+    if(!merklRetry){
+      merklRetry=true;
+      setTimeout(async()=>{
+        try{
+          const j=await(await fetch(ENDPOINTS.merkl)).json();
+          if(Array.isArray(j)){
+            rebuildMerkl(j);
+            SRC.merkl={state:"live",at:new Date().toLocaleTimeString("en-US",{hour12:false,hour:"2-digit",minute:"2-digit"})};
+            rebuildProj(); evalVerdicts(); paintSources(); rerender();
+          }
+        }catch(e){}
+        merklRetry=false;
+      },75000);
+    }
+  }
   rebuildProj();
   if(ch.status==="fulfilled"){ SRC.chain={state:"live",at:t,block:parseInt(ch.value,16)}; }
   else if(SRC.chain.block) SRC.chain.state="stale";
