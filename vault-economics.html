@@ -267,11 +267,11 @@
      expandable rows. So the header is deliberately NOT sticky; the reading key sits above the
      table instead, where it is available before you start scrolling. */
   .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; background: var(--bg-elev); border: 1px solid var(--panel-border); border-radius: var(--radius); box-shadow: var(--card-shadow); }
-  table.board { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 900px; }
+  table.board { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 820px; }
   table.board thead th {
     z-index: 2;
     background: var(--bg-elev);
-    padding: 13px 16px; text-align: left;
+    padding: 12px 10px; text-align: left;
     color: var(--text-mute); font-size: 11px; font-weight: 500;
     text-transform: uppercase; letter-spacing: .5px;
     border-bottom: 1px solid var(--border);
@@ -285,7 +285,7 @@
   table.board tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
   table.board tbody tr:hover { background: var(--row-hover); }
   table.board tbody tr:last-child { border-bottom: none; }
-  table.board tbody td { padding: 13px 16px; color: var(--text-dim); white-space: nowrap; vertical-align: middle; }
+  table.board tbody td { padding: 12px 10px; color: var(--text-dim); white-space: nowrap; vertical-align: middle; }
   table.board tbody td.numeric { text-align: right; font-variant-numeric: tabular-nums; font-family: var(--font-mono); font-size: 12.5px; color: var(--text-mute); }
   .pool-cell { display: flex; flex-direction: column; gap: 2px; max-width: 320px; }
   .pool-cell .name { font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; }
@@ -492,6 +492,18 @@
   .ladder tr:last-child td { border-bottom: none; }
   .ladder-foot { font-size: 12px; color: var(--text-mute); line-height: 1.55; margin: 9px 0 0; }
   .ladder-foot b { color: var(--accent); }
+
+  /* the §02 card's engine-breakdown toggle */
+  .cardladder { margin-top: 8px; }
+  .cardladder > summary {
+    list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11.5px; color: var(--text-mute); user-select: none;
+  }
+  .cardladder > summary::-webkit-details-marker { display: none; }
+  .cardladder > summary:hover { color: var(--primary-hov); }
+  .cardladder > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 3px; }
+  .cardladder > summary .caret { font-size: 9px; transition: transform .15s; }
+  .cardladder[open] > summary .caret { transform: rotate(180deg); }
 
   /* ============ ENGINE EXAMPLES (jump into the board) ============ */
   .engex { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
@@ -1204,6 +1216,44 @@ function buildSpoke(){
   };
   // carry pair: 10x base + w/ fees + w/ incentive, joined from PROJ so cards and the §03 table agree.
   // If base is negative but a fee estimate exists (the #3 case), lead with the fee figure.
+  /* The same four-engine build-up the Fluid teardowns show, for a proposed Aave structure.
+     Everything is additive through the loop identity: lending spread + collateral staking +
+     swap fees + incentives sum to the full total, exactly. lending and staking are live; the
+     swap-fee row is a live Fluid comparable (D) since a fresh Aave pool has no volume history,
+     and the incentive is a live-but-temporary Merkl campaign. */
+  const aaveLadder=p=>{
+    if(!p||!p.eng) return "";
+    const e=p.eng, L=PROJ_L;
+    const lend=e.lend, total=e.lend+e.native+e.fees+e.inc;
+    const steps=[
+      {k:"native",lbl:"collateral staking / funding",       v:e.native,cls:"native",tag:""},
+      {k:"fees",  lbl:"live Fluid comparable, not measured here", v:e.fees,  cls:"fees",  tag:'<span class="tag d" style="margin-left:5px">D</span>'},
+      {k:"inc",   lbl:"Merkl campaign, while it runs",       v:e.inc,   cls:"inc",   tag:'<span class="lq temp" style="margin-left:5px">temp</span>'},
+    ].filter(x=>Math.abs(x.v)>=0.005);
+    const nm={base:"Base carry",native:"Native yield",fees:"Swap fees",inc:"Incentive"};
+    const row=(lbl,val,delta,cls,chip,tag)=>`<tr${cls?` class="${cls}"`:""}><td>${chip?`<span class="chip ${chip}">${nm[chip]}</span>`:""}<span class="ladder-lbl">${lbl}${tag||""}</span></td>
+      <td class="numeric mono ${val>=0?"pos":"neg"}">${f(val,true)}</td>
+      <td class="numeric mono" style="color:var(--text-mute)">${delta==null?"":sgn(delta,2)+"pp"}</td></tr>`;
+    let run=lend, body=row("lend minus borrow, nothing else", lend, null, "", "base", "");
+    for(const st of steps){ run+=st.v; body+=row(st.lbl, run, st.v, "", st.cls, st.tag); }
+    body+=row("= the headline (fees + incentive)", total, null, "total", "", "");
+    const flips=steps.filter(x=>(total-x.v<0)!==(total<0));
+    const foot = flips.length===1
+      ? `<b>${flips[0].k==="inc"?"The incentive":flips[0].k==="fees"?"Swap fees":"Native yield"} alone decides the sign.</b> Remove it and this structure is ${f(total-flips[0].v,true)}.`
+      : flips.length>1
+      ? `<b>No single engine carries it.</b> Removing any one of ${flips.map(x=>x.k==="inc"?"the incentive":x.k==="fees"?"swap fees":"native yield").join(" or ")} flips the sign.`
+      : lend<0 ? `The lending spread alone is ${f(lend,true)}; the engines above carry the rest.`
+      : `Every engine is additive — none alone is load-bearing for the sign.`;
+    return `<div class="ladder" style="margin-top:8px">
+      <div class="ladder-h">Where the ${f(total,true)} comes from <span class="tag d">D</span>
+        <span class="ladder-note">each engine added in turn, at ${PROJ_L}×</span></div>
+      <table><tbody>${body}</tbody></table>
+      <p class="ladder-foot">${foot}</p></div>`;
+  };
+  const engineBreakdown=v=>{
+    const lad=aaveLadder(PROJ.find(q=>q.r===v.r));
+    return lad?`<details class="cardladder"><summary>engine breakdown<span class="caret">▼</span></summary>${lad}</details>`:"";
+  };
   const carryPair=v=>{
     const p=PROJ.find(q=>q.r===v.r); if(!p) return "";
     const seg=(lbl,val,cls,extra)=>`<span class="cp">${lbl}</span><b class="${cls}">${val}</b>${extra||""}`;
@@ -1235,6 +1285,7 @@ function buildSpoke(){
         ${carryPair(v)}
         ${incLine(v)}
         <p class="snote">${v.note.replace("{V51}",f(V[51].maxLev,true)).replace("{SUSDE}",NATIVE.sUSDe?NATIVE.sUSDe.toFixed(2)+"%":"not published")}</p>
+        ${engineBreakdown(v)}
       </div>
     </div>`;}).join("");
   /* Three states, not two: a campaign that ended days ago used to be styled identically to
@@ -1897,10 +1948,20 @@ function rebuildProj(){
     const fc=s.fee==="btc"?FEECOMP.btc:s.fee==="eth"?FEECOMP.eth:null;
     const feePP=fc?(fc.col*L+fc.debt*(L-1)):null;
     p.fees=(feePP&&Math.abs(feePP)>=0.05)?"~"+sgn(base+feePP,0)+"%":"—";
-    const inc=(s.incKey&&INC[s.incKey]!=null)?(s.side==="supply"?base+INC[s.incKey]*L:base+INC[s.incKey]*(L-1)):null;
+    const incC=(s.incKey&&INC[s.incKey]!=null)?(s.side==="supply"?INC[s.incKey]*L:INC[s.incKey]*(L-1)):0;
+    const inc=incC?base+incC:null;
     p.inc=inc!=null?sgn(inc,1)+"%":"—";
     p.usd=(base<0?"−$":"+$")+Math.abs(base*0.1).toFixed(1)+"M";
     p.sup=(sl?"":"~")+sup.toFixed(2)+"%"; p.bor=bor.toFixed(2)+"%"; p.note=s.note;
+    /* the same four-engine split the Fluid teardowns show, for the proposed Aave structure.
+       lending spread + staking + swap fees + incentives, each through the loop, summing to the
+       full total. Only available when the supply leg is live (parts carry lend/native per token). */
+    if(sl){
+      const lendCol=sl.parts.reduce((a,x)=>a+x.lend,0)/sl.parts.length;
+      const natCol =sl.parts.reduce((a,x)=>a+x.nat ,0)/sl.parts.length;
+      p.eng={ lend:lendCol*L-bor*(L-1), native:natCol*L, fees:feePP||0, inc:incC,
+              feeEst:s.fee!=null, incTemp:!!incC };
+    } else p.eng=null;
   });
 }
 
@@ -2081,11 +2142,11 @@ const COLS=[
   {k:"fam",label:"Family",sort:r=>famOf(r.pair)},
   {k:"src",label:"Engine",sort:r=>r.src},
   {k:"col",label:"TVL",numeric:true},
-  {k:"eq",label:"Net equity",numeric:true},
+  {k:"eq",label:"Equity",numeric:true},
   {k:"util",label:"Wound",numeric:true},
-  {k:"cap",label:"Cap fill (coll)",numeric:true},
+  {k:"cap",label:"Cap fill",numeric:true},
   {k:"pos",label:"Users",numeric:true},
-  {k:"lev",label:"Max Lev APY",numeric:true,anchor:true},
+  {k:"lev",label:"Max APY",numeric:true,anchor:true},
 ];
 /* Default sort is TVL, not APY. APY-descending put USDC-ETH (unverified, swap-fee driven,
    moved ~20pp within one session) in row 1 — the first and loudest number on the page was
@@ -2168,7 +2229,7 @@ function renderBoard(){
   const g=LB.gho, isLive=SRC.fluid.state==="live";
   document.getElementById("board-note").innerHTML=
     `${isLive?`<b>Click any row</b> to open its full teardown — the same decomposition the curated cards below show, computed for every vault. `:''}<b>Two rows carry an asterisk.</b> GHO-USDC (v61) is <b class="${g.lev<0?'neg':'pos'}">${f(g.lev,true)}</b> ex-reward and ${f(g.wrew,true)} only via a temporary Merkl campaign <button class="ghochip" data-goto="gho-pattern">GHO pattern ↗</button>. Rows marked <span class="unvchip">unverified</span> are not offered in Fluid's Multiply UI, so their APY is computed rather than confirmed against Fluid's own page. ⇅ = swap-fee-driven, drifts intraday. A second figure under an APY is either that vault <b>ex-reward</b> (what it pays once the Merkl subsidy is removed) or its <b>unlevered</b> return. <span style="color:var(--accent);font-weight:600">Amber&nbsp;⚠</span> marks the cases worth pausing on: the carry spread is <b>negative</b>, so <span class="mono">L·(S−B)+B</span> lands <i>below</i> the unlevered supply rate and looping returns less than simply holding the collateral. Those rows are green only because of the subsidy, or green in spite of leverage rather than because of it — and a few are not green at all. ${
-      isLive?`$ / utilization / cap-fill / users are <span class="tag r">R</span> (live Fluid API); Max Leverage APY is <span class="tag d">D</span>, recomputed from raw rates on refresh. A cap-fill of “—” means that side has no DEX pool, so it has no cap to fill.`
+      isLive?`$ / utilization / cap-fill / users are <span class="tag r">R</span> (live Fluid API); Max Leverage APY is <span class="tag d">D</span>, recomputed from raw rates on refresh. <b>Cap fill</b> is the collateral side only (the teardown shows both); “—” means that side has no DEX pool, so it has no cap to fill.`
             :`<b>These are the ${SNAPDATE} snapshot rows</b> — a curated subset, not the full vault set — and rows are not expandable until a live fetch lands.`}`;
 }
 document.getElementById("board").addEventListener("click",e=>{
