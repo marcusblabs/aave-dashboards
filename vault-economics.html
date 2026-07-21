@@ -1227,7 +1227,7 @@ function buildSpoke(){
     const lend=e.lend, total=e.lend+e.native+e.fees+e.inc;
     const steps=[
       {k:"native",lbl:"collateral staking / funding",       v:e.native,cls:"native",tag:""},
-      {k:"fees",  lbl:"live Fluid comparable, not measured here", v:e.fees,  cls:"fees",  tag:'<span class="tag d" style="margin-left:5px">D</span>'},
+      {k:"fees",  lbl:e.feeSrc?`from live pools — ${e.feeSrc}`:"swap fees", v:e.fees, cls:"fees", tag:'<span class="tag d" style="margin-left:5px">D</span>'},
       {k:"inc",   lbl:"Merkl campaign, while it runs",       v:e.inc,   cls:"inc",   tag:'<span class="lq temp" style="margin-left:5px">temp</span>'},
     ].filter(x=>Math.abs(x.v)>=0.005);
     const nm={base:"Base carry",native:"Native yield",fees:"Swap fees",inc:"Incentive"};
@@ -1244,11 +1244,15 @@ function buildSpoke(){
       ? `<b>No single engine carries it.</b> Removing any one of ${flips.map(x=>x.k==="inc"?"the incentive":x.k==="fees"?"swap fees":"native yield").join(" or ")} flips the sign.`
       : lend<0 ? `The lending spread alone is ${f(lend,true)}; the engines above carry the rest.`
       : `Every engine is additive — none alone is load-bearing for the sign.`;
+    /* swap fees are omitted, not zero, when the collateral pool does not exist live */
+    const noPoolNote = e.feeKnown===false
+      ? ` <span style="color:var(--accent)">Swap fees are not counted here — this structure's collateral pool is not live on Fluid, so its trading APR cannot be read.</span>`
+      : "";
     return `<div class="ladder" style="margin-top:8px">
       <div class="ladder-h">Where the ${f(total,true)} comes from <span class="tag d">D</span>
         <span class="ladder-note">each engine added in turn, at ${PROJ_L}×</span></div>
       <table><tbody>${body}</tbody></table>
-      <p class="ladder-foot">${foot}</p></div>`;
+      <p class="ladder-foot">${foot}${noPoolNote}</p></div>`;
   };
   const engineBreakdown=v=>{
     const lad=aaveLadder(PROJ.find(q=>q.r===v.r));
@@ -1259,12 +1263,13 @@ function buildSpoke(){
     const seg=(lbl,val,cls,extra)=>`<span class="cp">${lbl}</span><b class="${cls}">${val}</b>${extra||""}`;
     const bcls=p.base.startsWith("−")?"neg":"pos";
     const bits=[];
-    if(p.base.startsWith("−") && p.fees!=="—"){
+    const hasFee=p.fees!=="—"&&p.fees!=="n/a";
+    if(p.base.startsWith("−") && hasFee){
       bits.push(seg("10× ~w/ fees",p.fees,"pos",' <span class="tag d">D</span>'));
       bits.push(seg("· base",p.base,bcls));
     }else{
       bits.push(seg("10× base",p.base,bcls));
-      if(p.fees!=="—") bits.push(seg("· ~w/ fees",p.fees,"pos",' <span class="tag d">D</span>'));
+      if(hasFee) bits.push(seg("· ~w/ fees",p.fees,"pos",' <span class="tag d">D</span>'));
     }
     if(p.inc!=="—") bits.push(seg("· w/ incentive",p.inc,"pos",' <span class="lq temp" style="margin:0">temp</span>'));
     return `<div class="carrypair">${bits.join(" ")}</div>`;
@@ -1299,7 +1304,7 @@ function buildSpoke(){
   }).join("");
   const projRows=PROJ.map(p=>{
     const bcls=p.base.startsWith('−')?'neg':'pos';
-    const feeCell=p.fees==='—'?'<span style="color:var(--faint)">—</span>':`<span class="pos" style="font-weight:700">${p.fees}</span>`;
+    const feeCell=p.fees==='—'?'<span style="color:var(--faint)">—</span>':p.fees==='n/a'?'<span style="color:var(--faint)" title="the collateral pool for this structure is not live on Fluid, so its swap fees cannot be read">n/a</span>':`<span class="pos" style="font-weight:700">${p.fees}</span>`;
     const incCell=p.inc==='—'?'<span style="color:var(--faint)">—</span>':`<span class="pos" style="font-weight:700">${p.inc}</span> <span class="lq temp" style="margin:0">temp</span>`;
     const ucls=p.usd.startsWith('−')?'neg':'pos';
     return `<tr><td>${p.pair}</td><td class="mono">${p.sup}</td><td class="mono">${p.bor}</td><td class="mono ${bcls}" style="font-weight:700">${p.base}</td><td class="mono">${feeCell}</td><td class="mono">${incCell}</td><td class="mono ${ucls}">${p.usd}</td><td style="color:var(--faint);font-size:11px">${p.note}</td></tr>`;
@@ -1359,7 +1364,7 @@ function buildSpoke(){
     <div class="tbl-wrap"><table class="audit"><thead><tr><th>Vault</th><th>Supply 1×</th><th>Borrow 1×</th><th>10× base</th><th>~w/ fees <span class="tag d">D</span></th><th>w/ incentive</th><th>$/yr @$10M · base</th><th>note</th></tr></thead><tbody>${projRows}</tbody></table></div>
     <div class="call" style="margin-top:14px">
       <h4>How to read it</h4>
-      <p>Max APY = <span class="mono">Supply × ${PROJ_L} − Borrow × ${PROJ_L-1}</span> — the loop identity, validated against Fluid's own pages. Read the <b>10× base</b> column for what each structure pays unsubsidised, and the <b>w/ incentive</b> column for what the current campaigns add on top <button class="ghochip" data-goto="gho-pattern">GHO pattern ↗</button>. The fee column <span class="tag d">D</span> uses live Fluid comparables, applied per side (collateral ×${PROJ_L}, debt rebate ×${PROJ_L-1}): BTC pair ${FEECOMP.btc.col.toFixed(2)}/${FEECOMP.btc.debt.toFixed(2)}%/side → ${sgn(FEECOMP.btc.col*PROJ_L+FEECOMP.btc.debt*(PROJ_L-1),1)}%, ETH pair ${FEECOMP.eth.col.toFixed(2)}/${FEECOMP.eth.debt.toFixed(2)}% → ${sgn(FEECOMP.eth.col*PROJ_L+FEECOMP.eth.debt*(PROJ_L-1),1)}%. Stable pools have no Fluid comparable, and a comparable that rounds to zero is shown as — rather than implying a fee that is not there. <b>Borrow legs are read live from the Aave API</b>; supply legs remain external native-yield estimates.</p>
+      <p>Max APY = <span class="mono">Supply × ${PROJ_L} − Borrow × ${PROJ_L-1}</span> — the loop identity, validated against Fluid's own pages. Read the <b>10× base</b> column for what each structure pays unsubsidised, and the <b>w/ incentive</b> column for what the current campaigns add on top <button class="ghochip" data-goto="gho-pattern">GHO pattern ↗</button>. The fee column <span class="tag d">D</span> reads each leg's swap fee from <b>its own live Fluid pool</b> — the collateral pool ×${PROJ_L}, a pool debt ×${PROJ_L-1}, a single-token debt earns none. It is the trading APR of the pool that actually holds those two tokens, not a family-wide proxy: LBTC-cbBTC's collateral pool earns ${POOLFEE["LBTC|cbBTC"]?(POOLFEE["LBTC|cbBTC"].tr).toFixed(2):"0.00"}% while the WBTC-cbBTC debt pool earns ${POOLFEE["WBTC|cbBTC"]?(POOLFEE["WBTC|cbBTC"].tr).toFixed(2):"0.36"}%, so they are counted separately. Where a leg's pool does not exist live (a collateral pool that has not been created yet), the fee is shown as <b>n/a</b> rather than borrowed from an unrelated pool. <b>Both loan legs are read live from the Aave API</b>; supply legs add the token's native yield from Fluid.</p>
       <p style="color:var(--faint);font-size:12px"><b>Estimate <span class="tag d">D</span>.</b> Native yields are external, approximate and <b>variable</b> (sUSDe shown at ~6% has ranged ~4-25%; weETH ~2.9%, wstETH ~2.2%, LBTC ~1.5% + unpriced points). $/yr = base 10× carry on $10M, indicative only. See Method &amp; caveats for what these figures are gross of.</p>
     </div>
   </section>
@@ -1560,6 +1565,16 @@ function supplyLeg(hub,toks){
 }
 
 /* mean live borrow APY across a structure's debt tokens; null if any leg is missing */
+/* live trading APR for the DEX pool that trades this exact token pair, or null if none exists.
+   A single-token leg has no pool and earns no swap fee (returns {tr:0}). */
+function poolFee(toks){
+  if(!toks) return null;
+  const ts=toks.map(t=>t==="ETH"?"WETH":t);
+  if(ts.length<2) return {tr:0, single:true};
+  const p=POOLFEE[ts.slice().sort().join("|")];
+  return p?{tr:p.tr, id:p.id, pair:p.pair}:null;
+}
+
 function borrowLeg(hub,toks){
   const v=toks.map(t=>ABORROW[hub+"|"+t]).filter(Boolean);
   if(v.length!==toks.length) return null;
@@ -1570,7 +1585,8 @@ function borrowLeg(hub,toks){
 const SNAPSIGN={tear:Object.fromEntries(ORDER.map(id=>[id,V[id].maxLev>=0])),ghoEx:LB.gho.lev>=0,projBase:PROJ.map(p=>!p.base.startsWith("−"))};
 /* Fluid comparable pool fees, kept per side (collateral earns, debt rebates) because the
    two are not equal in general — v77 currently reads 16.69 / 14.85. Refreshed from live v51/v44. */
-const FEECOMP={btc:{col:0.38,debt:0.38},eth:{col:0.03,debt:0.03}};
+/* live DEX-pool trading APR by sorted token pair — "TOKA|TOKB" -> {tr, id, pair} */
+const POOLFEE={};
 const LASTINC={usdg:6.20,frx:5.36,susde:3.75,weth:0.77}; // last known Merkl APRs (snapshot defaults)
 let FLIPS=[];
 let merklRetry=false;
@@ -1817,6 +1833,22 @@ function applyFluid(vaults,byid){
       FLUID_SEEN.add(t.symbol);                       // seen with an explicit null => confirmed 0%
       if(num(t.stakingApr)>0) NATIVE[t.symbol]=num(t.stakingApr)/100;
     }
+  /* Swap-fee reading per TOKEN PAIR, from the actual live Fluid pool that trades those two
+     tokens — not a family-wide proxy. The old approach applied one WBTC-cbBTC pool (v51) to
+     every BTC structure, so LBTC-cbBTC (whose real pool earns 0%) was credited 0.36%/side it
+     does not earn. Keyed by the sorted token set, normalised ETH→WETH to match Aave naming;
+     keeps the highest trading APR seen for that pair across all vaults that host it. */
+  for(const k in POOLFEE) delete POOLFEE[k];
+  for(const raw of vaults){
+    if(+raw.type<=1) continue;
+    for(const [side,rk] of [["supplyToken","supplyRate"],["borrowToken","borrowRate"]]){
+      const ts=sideTokens(raw[side]).map(t=>t.symbol==="ETH"?"WETH":t.symbol);
+      if(ts.length<2) continue;
+      const key=ts.slice().sort().join("|");
+      const tr=num(raw[rk].dex.trading)/100;
+      if(!POOLFEE[key]||tr>POOLFEE[key].tr) POOLFEE[key]={tr,id:+raw.id,pair:ts.join("-")};
+    }
+  }
   const dex=vaults.filter(x=>+x.type>1);
   for(const k in DEC) delete DEC[k];
   const rows=dex.map(raw=>{try{
@@ -1866,8 +1898,6 @@ function applyFluid(vaults,byid){
   }
   /* live fee comparables for the spoke projections — independent of the wstETH study above,
      so a missing v44 no longer silently freezes the BTC comparable too */
-  if(byid["51"]){ const o=decompose(byid["51"]); FEECOMP.btc={col:o.col.trading,debt:o.debt.trading}; }
-  if(byid["44"]){ const o=decompose(byid["44"]); FEECOMP.eth={col:o.col.trading,debt:o.debt.trading}; }
 }
 
 function rebuildMerkl(opps){
@@ -1941,13 +1971,16 @@ function rebuildProj(){
     p.supLive=!!sl; p.supParts=sl?sl.parts:null;
     const base=sup*L-bor*(L-1);
     p.base=sgn(base,1)+"%";
-    /* Fee comparables are per-side: collateral earns ×L, debt rebates ×(L−1). Averaging the
-       two sides only coincides when they are equal, which is not general. A zero comparable
-       is treated as no comparable — otherwise the column silently implies a fee that is
-       not there (v44's collateral-side trading currently reads 0.00%). */
-    const fc=s.fee==="btc"?FEECOMP.btc:s.fee==="eth"?FEECOMP.eth:null;
-    const feePP=fc?(fc.col*L+fc.debt*(L-1)):null;
-    p.fees=(feePP&&Math.abs(feePP)>=0.05)?"~"+sgn(base+feePP,0)+"%":"—";
+    /* Swap fees read from EACH LEG'S OWN live pool: the collateral pool earns ×L, a pool debt
+       rebates ×(L−1), a single-token debt earns nothing. If a 2-token leg has no live Fluid
+       pool at all (e.g. a proposed sUSDe-USDe collateral that does not exist yet), the fee is
+       genuinely unknowable and the whole leg is marked unavailable rather than guessed. */
+    const cFee=poolFee(s.col), dFee=poolFee(s.debt);
+    p.cFee=cFee; p.dFee=dFee;
+    const feeKnown = !!(cFee && dFee);             // both legs resolved to a pool (or single-token)
+    const feePP = feeKnown ? (cFee.tr*L + dFee.tr*(L-1)) : null;
+    p.feePP=feePP;
+    p.fees=(feePP&&Math.abs(feePP)>=0.05)?"~"+sgn(base+feePP,0)+"%":(feeKnown?"—":"n/a");
     const incC=(s.incKey&&INC[s.incKey]!=null)?(s.side==="supply"?INC[s.incKey]*L:INC[s.incKey]*(L-1)):0;
     const inc=incC?base+incC:null;
     p.inc=inc!=null?sgn(inc,1)+"%":"—";
@@ -1959,8 +1992,14 @@ function rebuildProj(){
     if(sl){
       const lendCol=sl.parts.reduce((a,x)=>a+x.lend,0)/sl.parts.length;
       const natCol =sl.parts.reduce((a,x)=>a+x.nat ,0)/sl.parts.length;
-      p.eng={ lend:lendCol*L-bor*(L-1), native:natCol*L, fees:feePP||0, inc:incC,
-              feeEst:s.fee!=null, incTemp:!!incC };
+      /* fee source label: name the actual pool(s) read, so a reader can see the 0% is real.
+         When no live pool exists for a leg, the swap-fee engine is omitted from the ladder. */
+      const feeSrc = feeKnown ? [
+        cFee.tr?`${cFee.pair} pool ${(cFee.tr).toFixed(2)}%`:(cFee.single?null:`${s.col.join("-")} pool 0%`),
+        (dFee.single?null:(dFee.tr?`${dFee.pair} debt ${(dFee.tr).toFixed(2)}%`:`${s.debt.join("-")} debt 0%`)),
+      ].filter(Boolean).join(" · ") : null;
+      p.eng={ lend:lendCol*L-bor*(L-1), native:natCol*L,
+              fees:feePP||0, feeKnown, feeSrc, inc:incC, incTemp:!!incC };
     } else p.eng=null;
   });
 }
