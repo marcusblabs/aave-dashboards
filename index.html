@@ -222,10 +222,17 @@
   <div class="shell">
 
     <section class="block" aria-label="Introduction">
-      <p class="lede">Each page reads its own data at page load and on demand &mdash; on-chain state straight from
-        public RPC endpoints, protocol rates from public APIs. <b>No backend, no API keys, nothing cached
-        server-side.</b> Every derived number is recomputed in your browser from the raw inputs, and each page
-        labels which of its numbers are read from source, derived, or snapshot-dated.</p>
+      <p class="lede">Aave v4 splits lending into isolated <b>hubs</b> and <b>spokes</b>. The
+        <b>DEX Spoke initiative</b> is the case for a spoke that accepts a two-token DEX pool as
+        collateral &mdash; which is what a correlated-pair loop vault needs.</p>
+      <p class="lede">A <b>loop</b>: deposit $1,000 of wstETH, borrow ETH against it, buy more wstETH,
+        repeat. Because the two track each other closely, Fluid lends up to 95% against it &mdash; so your
+        $1,000 ends up holding <b>$20,000 of wstETH against $19,000 of ETH debt</b>. Every 0.1% the
+        collateral out-earns the loan is worth about <b>2% on your original $1,000</b>. Leverage cuts both
+        ways: when the loan out-earns the collateral, you lose at the same rate.</p>
+      <p class="lede"><b>Loop Economics</b> asks whether that gap survives real rates and fees.
+        <b>Spoke Caps</b> asks whether there is room left to get in. Both compute everything in your
+        browser from public APIs &mdash; no backend, no API keys, nothing cached server-side.</p>
     </section>
 
     <section class="block" aria-label="Dashboards">
@@ -234,8 +241,9 @@
 
         <a class="dcard live" href="spoke-caps/">
           <div class="top"><h3>Tokenization Spoke Caps</h3><span class="tag live">Fully live</span></div>
-          <p>Deposit-cap headroom on the <b>waCore*</b> ERC-4626 wrappers across the Ethereum &amp; Avalanche
-            Core Hubs &mdash; cap, supplied and available per wrapper, with fill bands and halt/freeze state.</p>
+          <p><b>Is there still room to deposit?</b> Live cap headroom on the <b>waCore*</b> ERC-4626
+            wrappers across the Ethereum &amp; Avalanche Core Hubs &mdash; cap, supplied and available per
+            wrapper, with fill bands and halt/freeze state, read straight from the hub contracts.</p>
           <div class="meta">
             <span>24 wrappers · 2 chains</span>
             <span>source: Core Hub contracts</span>
@@ -245,8 +253,9 @@
 
         <a class="dcard live" href="vault-economics.html">
           <div class="top"><h3>Correlated-Pair Loop Economics</h3><span class="tag live">Fully live</span></div>
-          <p>Fluid's correlated-pair loop vaults decomposed into their four <b>APR engines</b>, ranked and torn
-            down vault by vault, then the same loop structures evaluated against <b>Aave v4 hub liquidity</b>.</p>
+          <p><b>Which loops actually pay, and what is paying for them?</b> Every Fluid DEX vault ranked by
+            leveraged APR and split into four <b>APR engines</b> &mdash; native yield, swap fees, base carry,
+            incentives &mdash; then the same structures repriced against <b>Aave v4 hub liquidity</b>.</p>
           <div class="meta">
             <span>Fluid + Merkl + Aave v4</span>
             <span>in-page recompute</span>

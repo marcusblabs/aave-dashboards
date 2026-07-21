@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://api.fontshare.com" crossorigin>
 <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<title>Loop Economics · Aave v4 Dashboards</title>
+<title>Loop Economics (v2, archived) · Aave v4 Dashboards</title>
 <style>
   :root {
     --bg:          #383e47;
@@ -200,7 +200,6 @@
   .kpi .val.primary { color: var(--pos); }
   .kpi .val.dim { color: var(--text-dim); font-size: 18px; }
   .kpi[title] { cursor: help; }
-  .kpi .sub { font-size: 11.5px; color: var(--text-mute); margin-top: 3px; }
 
   /* ============ SHELL + SECTIONS ============ */
   .shell { max-width: 1160px; margin: 0 auto; padding: 0 28px; }
@@ -428,37 +427,6 @@
   table.board th .thbtn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 3px; }
   table.board tr.expandable { cursor: pointer; }
   table.board tr.expandable:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
-  /* ============ GLOSSARY ============ */
-  .glossary { margin: 22px 0 4px; border: 1px solid var(--panel-border); border-left: 3px solid var(--primary);
-              border-radius: var(--radius); background: var(--bg-elev); box-shadow: var(--card-shadow); }
-  .glossary > summary {
-    list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px;
-    padding: 13px 18px; font-size: 13.5px; color: var(--text-mute); user-select: none;
-  }
-  .glossary > summary::-webkit-details-marker { display: none; }
-  .glossary > summary b { color: var(--text); font-weight: 700; }
-  .glossary > summary:hover { color: var(--text-dim); }
-  .glossary > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; border-radius: var(--radius); }
-  .glossary > summary .caret { margin-left: auto; font-size: 10px; transition: transform .15s; }
-  .glossary[open] > summary .caret { transform: rotate(180deg); }
-  .glossary[open] > summary { border-bottom: 1px solid var(--border); }
-  .gbody { padding: 6px 18px 18px; columns: 2; column-gap: 34px; }
-  .gbody h4 {
-    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase;
-    color: var(--primary-hov); margin: 16px 0 8px; break-after: avoid;
-  }
-  .gbody h4:first-child { margin-top: 6px; }
-  .gbody dl { margin: 0; }
-  .gbody dt {
-    font-weight: 700; font-size: 13px; color: var(--text); margin-top: 11px; break-after: avoid;
-    break-inside: avoid;
-  }
-  .gbody dt .alt { font-weight: 400; color: var(--text-mute); font-size: 12px; }
-  .gbody dd { margin: 3px 0 0; font-size: 12.5px; line-height: 1.55; color: var(--text-mute); break-inside: avoid; }
-  .gbody dd b { color: var(--text-dim); }
-  .gbody .mono { font-family: var(--font-mono); font-size: 11.5px; }
-  @media (max-width: 900px) { .gbody { columns: 1; } }
-
   /* ============ BOARD READING KEY (collapsed, above the table) ============ */
   .keycard { margin-bottom: 10px; }
   .keycard > summary {
@@ -671,6 +639,7 @@
     </div>
   </div>
 
+  <div style="background:var(--accent-soft);border-bottom:1px solid var(--accent);padding:9px 28px;font-family:var(--font-mono);font-size:11.5px;color:var(--text-dim)"><b style="color:var(--accent)">Archived v2</b> — kept for reference as of 2026-07-21. Data still refreshes live, but this layout is superseded. <a href="vault-economics.html" style="color:var(--primary-hov)">Open the current version &rarr;</a></div>
   <!-- PER-SOURCE FRESHNESS -->
   <div class="sources-bar">
     <div class="srcline" id="srcline">
@@ -681,98 +650,31 @@
     </div>
   </div>
 
-  <!-- KPI STRIP — every tile carries a visible sub-line. The tooltips stay, but they do not
-       exist on touch devices, so nothing load-bearing may live only in a title= attribute. -->
+  <!-- KPI STRIP -->
   <div class="kpi-strip">
     <div class="kpi" title="DEX vaults currently tracked from the Fluid API (smart collateral and/or smart debt)">
       <div class="label">Vaults tracked</div>
       <div class="val" id="kpi-vaults">—</div>
-      <div class="sub" id="kpi-vaults-sub">Fluid DEX vaults</div>
     </div>
     <div class="kpi" title="Vaults whose max-leverage APY is positive without any incentive campaign">
-      <div class="label">Green without subsidy</div>
+      <div class="label">Greens ex-incentive</div>
       <div class="val primary" id="kpi-greens">—</div>
-      <div class="sub">positive with no campaign running</div>
     </div>
     <div class="kpi" title="Share of tracked collateral sitting in vaults whose headline APY depends on a Merkl campaign — either for its sign, or for most of its magnitude.">
-      <div class="label">Subsidy-dependent</div>
+      <div class="label">Subsidy-dependent TVL</div>
       <div class="val dim" id="kpi-sources">—</div>
-      <div class="sub">of collateral leans on a campaign</div>
     </div>
-    <div class="kpi" title="Total collateral across every tracked DEX vault, from the live Fluid read. Collateral, not depositors' own money — most of it is borrowed.">
+    <div class="kpi" title="Total collateral across every tracked DEX vault, from the live Fluid read.">
       <div class="label">Tracked collateral</div>
       <div class="val dim" id="kpi-updated">—</div>
-      <div class="sub">gross, not depositors' own money</div>
     </div>
   </div>
 
   <div class="shell">
 
-      <!-- Terms of art, defined as THIS page computes them. Collapsed so it costs a regular
-           reader nothing, but gives a newcomer a start-here path before the numbers begin. -->
-      <details class="glossary">
-        <summary>New here? &nbsp;<b>What the words on this page mean</b><span class="caret">▼</span></summary>
-        <div class="gbody">
-        <h4>What a loop is</h4>
-        <dl>
-          <dt>Loop <span class="alt">· looping</span></dt><dd>Deposit collateral, borrow against it, swap what you borrowed back into more collateral, repeat until you hit the borrowing limit. Every vault on this page is a loop, and the page only ever describes the finished position — collateral worth <span class="mono">L</span> times your own money, debt worth <span class="mono">L−1</span> times it — never the individual turns.</dd>
-          <dt>Correlated pair</dt><dd>The collateral and the debt are two tokens whose prices track each other almost exactly — wstETH against ETH, WBTC against cbBTC, USDC against USDT. That is the entire reason these loops work: because the two legs move together, the lender allows a 92–95% collateral factor, which is what buys 12–20× leverage. Pair an uncorrelated debt instead and the limit falls to roughly 80% (5×).</dd>
-          <dt>Collateral factor <span class="alt">· CF</span></dt><dd>The share of your collateral's value you are allowed to borrow — a 95% CF means $95 of debt per $100 of collateral. It is read live from the protocol, and on this page it does exactly one job: it sets how far you can loop.</dd>
-          <dt>Leverage <span class="alt">· L · “at 20×”</span></dt><dd>How many times your own money you end up holding as collateral once the loop is fully wound: <span class="mono">L = 1 / (1 − CF)</span>. A 95% collateral factor gives 20×, 92% gives 12.5×, 80% gives 5×. Every “at 16.7×” on the page is this number; figures shown in prose are rounded to one decimal, the arithmetic uses the exact value.</dd>
-          <dt>Max Leverage APY</dt><dd>The headline number on this page — what a fully-wound loop pays per year on <i>your</i> money, not on the borrowed total: <span class="mono">Supply × L − Borrow × (L−1)</span>. It is a rate on carry only; it says nothing about price moves, liquidation, or slippage.</dd>
-          <dt>Spread <span class="alt">· carry spread</span></dt><dd>What one unlevered unit earns net: the supply rate minus the borrow rate, before any leverage. It matters because the loop identity rearranges to <span class="mono">L × (Supply − Borrow) + Borrow</span> — leverage multiplies the <i>spread</i>, not the return. When the spread is negative, every extra turn of the loop costs you money, which is what the amber ⚠ in the APY column marks.</dd>
-          <dt>Unlevered</dt><dd>What you would earn just holding the collateral and borrowing nothing — which is simply the net supply rate. When a row shows “+2.10% unlevered ⚠” beneath a green APY, it means looping to leverage actually pays <i>less</i> than sitting still, because the spread is negative.</dd>
-          <dt>Smart collateral <span class="alt">· smart debt</span></dt><dd>A side of the vault that is a two-token trading pool rather than a single token. Smart collateral means your deposit is providing liquidity, so it earns swap fees on top of lending interest; smart debt means what you owe is a pool position, so swap fees offset your borrow cost. A side that is a plain single token is called plain collateral / plain debt.</dd>
-          <dt>T2 / T3 / T4</dt><dd>Which sides of the vault are trading pools. <b>T2</b> = pool collateral, single-token debt. <b>T3</b> = single-token collateral, pool debt. <b>T4</b> = pools on both sides. (T1 is ordinary single-token lending with no pool at all, so it earns no swap fees and is not tracked here.)</dd>
-          <dt>P → P <span class="alt">· P → S</span></dt><dd>The shape of a loop structure: <b>P</b> = a two-token pool, <b>S</b> = a single token, collateral on the left, debt on the right. It matters because a pool <i>debt</i> borrows both of its tokens, so both must be borrowable — which is why the ETH structures can only be pool-collateral → single-token debt.</dd>
-        </dl>
-        <h4>Where the yield comes from</h4>
-        <dl>
-          <dt>Engine <span class="alt">· the four APR engines</span></dt><dd>The loop's return splits cleanly into four additive parts that sum to the headline exactly: <b>native yield</b>, <b>swap fees</b>, <b>base carry</b> and <b>incentives</b>. The coloured chip on each row names whichever one is <i>largest</i>, which is a statement about the driver and not about the sign — a losing vault can still be labelled “native yield”.</dd>
-          <dt>Native yield <span class="alt">· staking APR</span></dt><dd>Yield the token pays by itself — staking on a liquid-staking token, funding on a yield-bearing stablecoin. It cuts both ways: on the collateral side it is income, on the debt side it is a cost, because a debt denominated in a staking token grows on its own. Each token's contribution is scaled by its share of that side of the pool.</dd>
-          <dt>Swap fee <span class="alt">· trading APR</span></dt><dd>When a side of your position is a two-token pool, traders swapping through it pay a fee that accrues to the pool. On the collateral side that is income; on the debt side it offsets what you owe — one pool can pay you twice. It depends entirely on trading volume, so it is the engine that moves fastest and least predictably.</dd>
-          <dt>Base carry</dt><dd>The plain gap between the interest your collateral earns and the interest your debt costs — no staking, no swap fees, no rewards. It is the leftover engine, named when nothing else dominates, and on correlated pairs it is usually thin: the two legs are near-substitutes, so the market prices them close together.</dd>
-          <dt>Incentives <span class="alt">· Merkl campaign</span></dt><dd>A sponsor paying a token subsidy to anyone who supplies or borrows a particular asset, for a fixed window — often only a week at a time, renewed at the sponsor's discretion. Real cash, but rented: because a supply subsidy is earned on your <i>whole</i> leveraged collateral while the debt pays no matching charge, leverage magnifies it, and a vault can look excellent purely because a campaign is running.</dd>
-          <dt>Rebate</dt><dd>A reward paid on the <i>borrowing</i> side: it is taken off your borrow rate rather than added to your supply rate, and in one case here it cuts a borrow cost below the yield the collateral earns. Because it lands on the debt leg it scales with <span class="mono">L−1</span> rather than <span class="mono">L</span>.</dd>
-          <dt>Ex-reward <span class="alt">· ex-incentive</span></dt><dd>The same Max Leverage APY recomputed with every reward campaign removed from both sides. It answers one question: what does this vault pay the day the subsidy stops? Where the board shows a second, smaller figure under an APY, that is usually this.</dd>
-        </dl>
-        <h4>Aave v4 terms</h4>
-        <dl>
-          <dt>Hub <span class="alt">· Aave v4</span></dt><dd>A walled-off pool of liquidity inside Aave v4 — Core, Plus, Global Dollar and Prime on Ethereum. Liquidity does not move between hubs, so a loop only works if the token you supply and the token you borrow live in the <i>same</i> hub. That single constraint is what eliminates most candidate structures on this page.</dd>
-          <dt>Spoke <span class="alt">· Aave v4</span></dt><dd>A front door onto a hub, carrying its own risk settings. Two consequences on this page: the collateral factor is set per spoke, so the same token can allow different leverage depending on the door you use — and a reward campaign can apply on one spoke and not another (the WETH borrow rebate is EtherFi-spoke-only).</dd>
-          <dt>Borrowable liquidity <span class="alt">· depth</span></dt><dd>The dollars actually available to borrow right now — not the advertised rate. The page leads with it because an attractive rate on an empty pool is unusable (one token here advertises a rate against $0.80 of real liquidity). Bands: <b>deep</b> ≥ $10M · <b>ok</b> ≥ $1M · <b>thin</b> ≥ $10K · <b>dead</b> below that.</dd>
-          <dt>10× <span class="alt">· the Aave comparison</span></dt><dd>Every Aave v4 structure is priced at the same fixed 10× so the rows read like-for-like. That is a measuring stick, not a claim — Aave publishes no parameter covering a two-token correlated pool as collateral, so the leverage those structures would actually get is unknown. The Fluid leverage figures elsewhere on the page are real; these are illustrative.</dd>
-        </dl>
-        <h4>Reading the board</h4>
-        <dl>
-          <dt>TVL</dt><dd>The dollar value of collateral sitting in the vault — debt is not netted off. It is a gross figure, and looping inflates it: one dollar deposited and looped ten times shows up as roughly ten dollars of TVL. For the money actually at stake, read the next column.</dd>
-          <dt>Net equity</dt><dd>Collateral minus debt — the depositors' own money, what would be left if every position closed at today's prices. It is usually a small fraction of TVL, and it is the honest measure of how big a vault really is: the largest vault here holds about $36M of collateral against roughly $4M of real equity.</dd>
-          <dt>Util</dt><dd>Debt divided by collateral — how far the average position in this vault is wound up, expressed as a percentage. A vault at 89% is running close to its collateral factor and has little headroom before liquidation. <i>(Note: this is not the same “utilization” as a lending pool's borrowed-over-supplied ratio.)</i></dd>
-          <dt>Cap fill</dt><dd>How full the pool is against the deposit ceiling its operator set — 100% means it is closed to new money, so the strategy exists but you cannot get into it. A dash means that side is not a pool at all, so it has no ceiling to fill (which is different from being empty).</dd>
-          <dt>Users</dt><dd>Open positions in the vault — positions, not wallets, since one person can hold several. Read it against TVL: three positions holding $12M is a concentrated bet by a handful of players; four hundred positions holding the same is a market.</dd>
-          <dt>Green <span class="alt">· red</span></dt><dd>Green means the Max Leverage APY is positive, red means negative — nothing more. It is a low bar on purpose: a vault can be green and still be a worse trade than simply holding the collateral, which is what the amber ⚠ flags. “Greens ex-incentive” counts only the rows that stay positive once every subsidy is removed.</dd>
-          <dt>⇅</dt><dd>This vault's result leans on swap-fee income, which tracks trading volume and moves within the day — rows so marked have swung several percentage points between two reads hours apart. Read the sign, not the decimal.</dd>
-          <dt>unverified</dt><dd>This strategy is not offered in the protocol's own interface, so its APY is computed by this page's method but was never checked against a published figure. The method itself was reconciled exactly against every vault that <i>is</i> offered — which is the point of the distinction.</dd>
-          <dt>R · D · NA</dt><dd>Where a number came from. <b>R</b> = read straight from a source API. <b>D</b> = derived here, with the arithmetic shown, recalculated from raw inputs on every refresh. <b>NA</b> = no source exposes it. Dollar amounts and protocol parameters are R; every APY on this page is D.</dd>
-          <dt>Structural · Volume-dep · Rate-thin · Reward-heavy</dt><dd>How likely the number is to survive. <b>Structural</b> — comes from yield the token pays by itself, and lasts as long as that source does. <b>Volume-dep</b> — comes from trading fees, so it follows volume. <b>Rate-thin</b> — nothing dominates; a narrow lending gap that can invert. <b>Reward-heavy</b> — subsidies are most of it.</dd>
-          <dt>Dust vault</dt><dd>A vault holding less than $500K — the strategy exists on paper but essentially nobody is in it. Rows like this open to a short stub rather than a full teardown, because a confident-looking decomposition of a vault with no deposits describes an idea, not a market. You can open the full version anyway.</dd>
-          <dt>Subsidy-dependent TVL</dt><dd>What share of all the collateral tracked here sits in vaults whose headline depends on a reward campaign — either for its sign, or for most of its size. A vault counts even if it would still be positive without the subsidy, provided the subsidy is most of what it pays.</dd>
-        </dl>
-        <h4>Units, risk and freshness</h4>
-        <dl>
-          <dt>pp <span class="alt">· percentage points</span></dt><dd>The unit for a <i>difference</i> between two percentages. “The rewards are worth +4.20pp” means they move the headline rate by 4.2 — from, say, +1.0% to +5.2% — not that they raise it by 4.2% of itself.</dd>
-          <dt>Basis point <span class="alt">· bp</span></dt><dd>One hundredth of a percentage point: 100bp = 1%. The wstETH study turns on this scale — the two borrow costs it compares sit a few basis points apart, which is why the answer flips sign as rates drift.</dd>
-          <dt>Liquidation threshold <span class="alt">· max limit · penalty</span></dt><dd>The <b>threshold</b> is the debt-to-collateral level at which your position starts being force-closed; the <b>max limit</b> is how far a liquidation may unwind it; the <b>penalty</b> is the discount the liquidator takes out of your collateral for doing it. These sit only a point or two above the collateral factor — that narrow band is the room a fully-wound loop has to move in.</dd>
-          <dt>Impermanent loss <span class="alt">· IL</span></dt><dd>When you hold a two-token pool position and the two prices drift apart, the pool automatically ends up holding more of the weaker token — leaving you worse off than if you had just held the two tokens separately. On the tightly correlated pairs here it is small, but it is real, and none of the APYs on this page subtract it.</dd>
-          <dt>LST <span class="alt">· liquid staking token</span></dt><dd>A token that stands in for staked ETH and quietly grows in value as staking rewards accrue — wstETH, weETH, rsETH and similar. That growth is why borrowing one is not free: your <i>debt</i> gets larger on its own, which is the question the wstETH section is asking.</dd>
-          <dt>flipped <span class="alt">· STALE · snapshot</span></dt><dd>Freshness words in the header. <b>flipped</b> — this conclusion's sign has changed since the reference date, so a finding written then no longer holds. <b>STALE</b> — a source failed to answer and you are seeing its last good value, deliberately not repainted as current. <b>snapshot</b> — no live data has arrived yet this session; the figures are the stored fallback.</dd>
-        </dl>
-        </div>
-      </details>
-
     <!-- FINDINGS -->
     <section class="block" aria-label="Findings">
-      <div class="block-head"><h2>Findings &mdash; the six Aave v4 structures</h2><span class="note">verdicts on the proposed structures in <a href="#" data-goto="spoke" style="color:var(--primary-hov)">&ldquo;At Aave v4 rates&rdquo;</a> below, not on the Fluid board &mdash; re-evaluated live, changes vs the 2026-07-15 snapshot are flagged</span></div>
+      <div class="block-head"><h2>Findings</h2><span class="note">re-evaluated from live numbers on every refresh — changes vs the 2026-07-15 snapshot are flagged</span></div>
       <div class="vstrip" id="findings"></div>
     </section>
 
@@ -851,7 +753,7 @@
     <a href="https://github.com/marcusblabs/aave-dashboards" target="_blank" rel="noopener">View source</a>
     · <a href="./">All dashboards</a>
     · <a href="https://marcusblabs.github.io/" target="_blank" rel="noopener">Balancer Toolkit</a>
-    · earlier versions: <a href="vault-economics-v2.html">v2</a> · <a href="vault-economics-v1.html">v1</a>
+    · <a href="vault-economics-v1.html">Previous layout</a>
   </span>
 </div>
 
@@ -1111,7 +1013,7 @@ const LOOPS=[
   {r:2,fam:"yusd",struct:"P → P",col:"sUSDe-USDe",debt:"USDC-USDT",hub:"Plus",hcls:"hub-plus",cap:"$2.87M",capTag:"d",
    dcheck:"debt pool: USDC $1.42M + USDT $1.45M — both borrowable in Plus",carry:"wide",carryL:"Wide · yield+fees",
    inc:{t:"supply",key:"susde"},
-   note:"Collateral pool = sUSDe + USDe + swap fees; debt = USDC+USDT, both borrowable in-hub. sUSDe carries the funding yield — {SUSDE} live — so this is the structure least dependent on a campaign."},
+   note:"Best carry, and the only one green on its own merits (5-9% funding) — the Merkl +3.75% is icing, not the reason. Collateral pool = sUSDe + USDe + swap fees; debt = USDC+USDT, both borrowable in-hub."},
   {r:3,fam:"btc",struct:"P → P",col:"WBTC-cbBTC",debt:"WBTC-cbBTC",hub:"Core",hcls:"hub-core",cap:"~$50M",capTag:"d",
    dcheck:"debt pool: WBTC $38M + cbBTC $12M — both borrowable, deep",carry:"thin",carryL:"Thin · swap-fee",inc:null,
    note:"The proven self-loop — this exact vault runs {V51} on Fluid right now (v51, recomputed live). No token yield or incentive, so pure swap-fee carry, but on the deepest BTC liquidity. The un-subsidized BTC structure next to #1."},
@@ -1234,7 +1136,7 @@ function buildSpoke(){
         <div class="scarry"><span class="carrychip ${v.carry}">${v.carryL}</span> <span style="font-family:var(--mono);font-size:10.5px;color:var(--faint)">${d.dcheck}</span></div>
         ${carryPair(v)}
         ${incLine(v)}
-        <p class="snote">${v.note.replace("{V51}",f(V[51].maxLev,true)).replace("{SUSDE}",NATIVE.sUSDe?NATIVE.sUSDe.toFixed(2)+"%":"not published")}</p>
+        <p class="snote">${v.note.replace("{V51}",f(V[51].maxLev,true))}</p>
       </div>
     </div>`;}).join("");
   /* Three states, not two: a campaign that ended days ago used to be styled identically to
@@ -1260,32 +1162,7 @@ function buildSpoke(){
   document.getElementById("spoke").innerHTML=`
   <div class="thesis">
     <h4>The findings</h4>
-    <p>${(()=>{
-      /* Derived, not asserted. This paragraph used to hard-code "the BTC pools are positive
-         without incentives" — which stopped being true the moment the supply legs went live
-         and #1 fell from an estimated 1.5% to a measured 0.17%. Nothing qualitative here is
-         written down; it is all read back off the same PROJ rows the table renders. */
-      const P=PROJ.map(x=>({r:x.r,pair:x.pair,base:pnum(x.base),inc:x.inc==="—"?null:pnum(x.inc)}));
-      const nm=g=>g.map(x=>"#"+x.r).join(", ");
-      const organic=P.filter(x=>x.base>0);
-      const rented=P.filter(x=>x.base<=0&&x.inc!=null&&x.inc>0);
-      const dead=P.filter(x=>x.base<=0&&!(x.inc!=null&&x.inc>0));
-      const best=organic.slice().sort((a,b)=>b.base-a.base)[0];
-      const weth=borrowLeg("Core",["WETH"]);
-      return [
-        organic.length
-          ? `<b>Positive without any incentive:</b> ${nm(organic)} — ${organic.length===1?"the only structure":"the only structures"} whose carry clears zero on published rates alone${best?`, led by ${best.pair.split(" → ")[0]} at ${sgn(best.base,1)}% base`:""}.`
-          : `<b>Nothing clears zero unsubsidised.</b> On today's published rates every one of the six structures has negative base carry — the green figures in the table all depend on a live campaign.`,
-        rented.length
-          ? `<b>Incentive-dependent:</b> ${nm(rented)} ${rented.length===1?"is":"are"} negative on base and green only while Merkl pays — the incentive, not the asset, is the yield <button class="ghochip" data-goto="gho-pattern">GHO pattern ↗</button>.`
-          : "",
-        dead.length
-          ? `<b>Negative either way:</b> ${nm(dead)} — no campaign currently lifts ${dead.length===1?"it":"them"} above zero.`
-          : "",
-        `<b>ETH pairs:</b> #4 and #5 draw on one shared ${weth?usdShort(weth.usd):"~$3M"} WETH pool; only #4 currently has a borrow rebate with runway.`,
-        `<b>Structural constraint:</b> each loop keeps at least one 2-token correlated pool (the swap-fee leg), and a pool debt borrows <b>both</b> tokens, so both must be borrowable in-hub — which is why BTC and Plus-stables can run pool&rarr;pool while ETH pairs are pool-collateral &rarr; single-WETH.`
-      ].filter(Boolean).join(" ");
-    })()}</p>
+    <p><b>Positive without incentives:</b> the BTC pools (#1, #3) on depth and <b>sUSDe</b> (#2) on carry — green on 5-9% funding with or without Merkl. <b>Incentive-dependent:</b> USDG-frxUSD (#6) is thin alone; ~5-6% supply rewards flip it wide under leverage — the incentive, not the asset, is the yield <button class="ghochip" data-goto="gho-pattern">GHO pattern ↗</button>. <b>ETH pairs:</b> #4 and #5 draw on one shared ${(borrowLeg("Core",["WETH"])||{}).usd!=null?usdShort(borrowLeg("Core",["WETH"]).usd):"$3.09M"} WETH pool; only #4 currently has a rebate with runway. Structural constraint: each loop keeps at least one 2-token correlated pool (the swap-fee leg), and a pool debt borrows <b>both</b> tokens, so both must be borrowable in-hub — which is why BTC and Plus-stables can run pool→pool while ETH pairs are pool-collateral → single-WETH.</p>
   </div>
 
   <div class="fresh"><b>⚠ Freshness:</b> live Merkl tranches end <b>${(()=>{const e=INCENT.map(i=>i.end).filter(x=>/^\d{4}/.test(x)).sort();return e.length?(e[0]===e[e.length-1]?e[0]:e[0]+" → "+e[e.length-1]):"—"})()}</b> — Merkl runs short (~weekly) tranches, renewal is the sponsor's call. §04 refreshes from Merkl with the button; <b>re-check it before quoting any with-incentive number.</b></div>
@@ -1409,30 +1286,6 @@ const HUBCLS={Core:"hub-core",Plus:"hub-plus","Global Dollar":"hub-gd",Prime:"hu
 /* per-hub, per-symbol live borrow rate + depth, keyed "Hub|SYMBOL" — the join every
    downstream projection needs. Rebuilt wholesale on each successful Aave fetch. */
 const ABORROW={};
-/* Aave SUPPLY apy per hub+symbol, for every asset (not just the borrowable ones). Deposit-side
-   lending interest only — it is driven by utilisation, so a collateral-only reserve reads 0%. */
-const ASUPPLY={};
-/* every token symbol the Fluid payload mentioned this refresh, whatever its stakingApr */
-const FLUID_SEEN=new Set();
-/* Native yield per token symbol, from Fluid's stakingApr. This is the token's OWN accrual
-   (staking, funding), which happens in its exchange rate wherever it is held — including inside
-   an Aave spoke, off Aave's book. Evidence the two are additive rather than double-counted:
-   every yield-bearing collateral reads supplyApy EXACTLY 0.0000% on Aave at 0% utilisation
-   (wstETH, weETH, sUSDe, LBTC, rsETH) while Fluid reports 2.20 / 2.89 / 3.86 / 0.33% for the
-   same tokens. If Aave's figure included the appreciation it could not be zero. */
-const NATIVE={};
-/* Tokens Fluid never lists at all (USDG, frxUSD appear in NO Fluid vault). Their native yield
-   is genuinely zero — both are non-rebasing dollar stables that do not appreciate; the
-   yield-bearing sibling sfrxUSD is a different asset — but without this the code could not tell
-   "confirmed 0%" from "never seen", and both would silently coerce to 0. Stating it makes the
-   zero a claim in the source rather than an accident of lookup semantics. */
-const NO_NATIVE_YIELD={
-  USDG:"non-rebasing stable — does not appreciate",
-  frxUSD:"non-rebasing stable — sfrxUSD is the yield-bearing sibling",
-  /* Aave calls it WETH, Fluid calls it ETH, so a symbol lookup never matches. Plain wrapped
-     ether has no native yield either way — but without this line the guard treats it as
-     UNKNOWN and drops structures #4 and #5 back to their dated estimates. */
-  WETH:"plain wrapped ether — no native yield (Fluid lists it as ETH)"};
 function applyAave(A){
   const borrowable={},frozen={},collCF={};
   /* Collateral factor is SPOKE-scoped, not hub-scoped: wstETH is 80% on Main but 95.5% on the
@@ -1468,11 +1321,6 @@ function applyAave(A){
       apy:pct(a.summary.borrowApy)||0,
     })).filter(a=>borrowable[h.name+"|"+a.t]).sort((a,b)=>b.usd-a.usd);
     rows.forEach(a=>{ ABORROW[h.name+"|"+a.t]={usd:a.usd,apy:a.apy}; });
-    /* built from the RAW asset rows, before the borrowable filter — the collateral tokens this
-       needs are precisely the ones that are not borrowable. Utilisation rides along so a
-       0.0000% supply APY can be shown as "nobody borrows this" rather than a failed read. */
-    (A.assets[i]||[]).forEach(a=>{ ASUPPLY[h.name+"|"+a.underlying.info.symbol]=
-      {apy:pct(a.summary.supplyApy)||0, util:pct(a.summary.utilizationRate)||0}; });
     /* collateral line: symbol + published CF, plus anything frozen, straight from the API */
     const coll=Object.keys(collCF).filter(k=>k.indexOf(h.name+"|")===0)
       .map(k=>({s:k.split("|")[1],cf:collCF[k].cf,spoke:collCF[k].spoke})).sort((a,b)=>b.cf-a.cf);
@@ -1489,25 +1337,6 @@ function applyAave(A){
     });
   });
 }
-/* Mean live SUPPLY apy across a structure's collateral tokens:
-     Aave lending interest for that reserve  +  the token's own native yield.
-   Equal-weighted across the pair — a 2-token correlated pool with no live Aave pool to read
-   reserves from, so 50/50 is the stated assumption, not a measurement.
-   Returns per-token detail so the table can show where each half came from. */
-function supplyLeg(hub,toks){
-  const parts=toks.map(t=>{
-    const a=ASUPPLY[hub+"|"+t];
-    const known = (t in NATIVE) || (t in NO_NATIVE_YIELD) || FLUID_SEEN.has(t);
-    return {t, lend:a?a.apy:null, util:a?a.util:null, nat:NATIVE[t]||0,
-            has:!!a, natKnown:known};
-  });
-  /* bail if any leg lacks a live Aave reserve, or if a token's native yield is simply unknown
-     rather than known-zero — better to keep the dated estimate than to publish a silent 0 */
-  if(parts.some(p=>!p.has||!p.natKnown)) return null;
-  const apy=parts.reduce((a,p)=>a+p.lend+p.nat,0)/parts.length;
-  return {apy, parts};
-}
-
 /* mean live borrow APY across a structure's debt tokens; null if any leg is missing */
 function borrowLeg(hub,toks){
   const v=toks.map(t=>ABORROW[hub+"|"+t]).filter(Boolean);
@@ -1755,17 +1584,6 @@ function applyFluid(vaults,byid){
     V[id].live=true; V[id].maxLev=o.maxLev; V[id].verdict=o.maxLev>=0?"green":"red";
   }
   /* leaderboards + study, recomputed across all live DEX vaults */
-  /* token -> native yield, harvested from every token Fluid publishes a stakingApr for.
-     Feeds the §03 supply legs, which used to be hand-typed estimates. */
-  for(const k in NATIVE) delete NATIVE[k];
-  FLUID_SEEN.clear();
-  for(const raw of vaults) for(const side of ["supplyToken","borrowToken"])
-    for(const k of ["token0","token1"]){
-      const t=(raw[side]||{})[k];
-      if(!t||!t.symbol) continue;
-      FLUID_SEEN.add(t.symbol);                       // seen with an explicit null => confirmed 0%
-      if(num(t.stakingApr)>0) NATIVE[t.symbol]=num(t.stakingApr)/100;
-    }
   const dex=vaults.filter(x=>+x.type>1);
   for(const k in DEC) delete DEC[k];
   const rows=dex.map(raw=>{try{
@@ -1863,18 +1681,15 @@ function rebuildMerkl(opps){
    so the borrow leg is READ LIVE from the Aave API rather than carried as a scraped number.
    `bor` is the 2026-07-15 fallback, used only until the first successful Aave fetch.
    Supply legs stay external native-yield estimates — they accrue off Aave's book. */
-/* Each structure names the tokens it actually deposits AND borrows, plus the hub, so BOTH legs
-   are read live from the Aave API. `sup`/`bor` are the 2026-07-15 fallbacks, used only until a
-   live fetch lands. Collateral hub differs from the debt hub for none of these today, but it is
-   carried separately so it can. */
 const PROJLEGS=[
-  {sup:1.5, bor:0.26,hub:"Core",col:["LBTC","cbBTC"],  debt:["WBTC","cbBTC"], fee:"btc",incKey:null,          note:"+ LBTC Lombard points on top, which nothing prices"},
-  {sup:6.0, bor:2.51,hub:"Plus",col:["sUSDe","USDe"],  debt:["USDC","USDT"],  fee:null, incKey:"susde",side:"supply",note:"the widest organic spread — green before any incentive; sUSDe funding is variable"},
-  {sup:0.0, bor:0.26,hub:"Core",col:["WBTC","cbBTC"],  debt:["WBTC","cbBTC"], fee:"btc",incKey:null,          note:"fee vault — base alone is red, fees are the story"},
-  {sup:2.9, bor:2.27,hub:"Core",col:["weETH","WETH"],  debt:["WETH"],         fee:"eth",incKey:"weth",side:"borrow",note:"WETH-borrow rebate cuts the borrow cost"},
-  {sup:2.2, bor:2.27,hub:"Core",col:["wstETH","WETH"], debt:["WETH"],         fee:"eth",incKey:null,          note:"thin — staking ≈ borrow"},
-  {sup:1.25,bor:2.34,hub:"Core",col:["USDG","frxUSD"], debt:["USDG","frxUSD"],fee:null, incKey:"usdgfrx",side:"supply",note:"negative base, incentive-flipped"},
-];const PROJ_L=10;   /* the stated yardstick: every structure compared at the same 10× */
+  {sup:1.5, bor:0.26,hub:"Core",debt:["WBTC","cbBTC"], fee:"btc",incKey:null,          note:"+ LBTC points on top (unpriced)"},
+  {sup:6.0, bor:2.51,hub:"Plus",debt:["USDC","USDT"],  fee:null, incKey:"susde",side:"supply",note:"the real engine — green before any incentive; funding variable"},
+  {sup:0.0, bor:0.26,hub:"Core",debt:["WBTC","cbBTC"], fee:"btc",incKey:null,          note:"fee vault — base alone is red, fees are the story"},
+  {sup:2.9, bor:2.27,hub:"Core",debt:["WETH"],         fee:"eth",incKey:"weth",side:"borrow",note:"WETH-borrow rebate cuts the borrow cost"},
+  {sup:2.2, bor:2.27,hub:"Core",debt:["WETH"],         fee:"eth",incKey:null,          note:"thin — staking ≈ borrow"},
+  {sup:1.25,bor:2.34,hub:"Core",debt:["USDG","frxUSD"],fee:null, incKey:"usdgfrx",side:"supply",note:"negative base, incentive-flipped"},
+];
+const PROJ_L=10;   /* the stated yardstick: every structure compared at the same 10× */
 function rebuildProj(){
   const L=PROJ_L;
   const INC=Object.assign({},LASTINC);
@@ -1884,11 +1699,7 @@ function rebuildProj(){
     const live=borrowLeg(s.hub,s.debt);
     const bor=live?live.apy:s.bor;
     p.borLive=!!live;
-    /* supply leg is now live too: Aave lending interest + the token's own native yield */
-    const sl=s.col?supplyLeg(s.hub,s.col):null;
-    const sup=sl?sl.apy:s.sup;
-    p.supLive=!!sl; p.supParts=sl?sl.parts:null;
-    const base=sup*L-bor*(L-1);
+    const base=s.sup*L-bor*(L-1);
     p.base=sgn(base,1)+"%";
     /* Fee comparables are per-side: collateral earns ×L, debt rebates ×(L−1). Averaging the
        two sides only coincides when they are equal, which is not general. A zero comparable
@@ -1900,7 +1711,7 @@ function rebuildProj(){
     const inc=(s.incKey&&INC[s.incKey]!=null)?(s.side==="supply"?base+INC[s.incKey]*L:base+INC[s.incKey]*(L-1)):null;
     p.inc=inc!=null?sgn(inc,1)+"%":"—";
     p.usd=(base<0?"−$":"+$")+Math.abs(base*0.1).toFixed(1)+"M";
-    p.sup=(sl?"":"~")+sup.toFixed(2)+"%"; p.bor=bor.toFixed(2)+"%"; p.note=s.note;
+    p.sup=(s.sup?"~"+s.sup:"~0")+"%"; p.bor=bor.toFixed(2)+"%"; p.note=s.note;
   });
 }
 
@@ -1918,7 +1729,7 @@ function verdictChips(){
   const btcD=borrowLeg("Core",["WBTC","cbBTC"]), plusD=borrowLeg("Plus",["USDC","USDT"]), wethD=borrowLeg("Core",["WETH"]);
   const btcTxt=btcD?usdShort(btcD.usd):"~$50M", plusTxt=plusD?usdShort(plusD.usd):"$2.9M", wethTxt=wethD?usdShort(wethD.usd):"$3.09M";
   return `
-    <div class="vchip ${c1ok?'good':'lean'}"><div class="vh"><span class="famdot fam-btc"></span>BTC pairs + sUSDe ${c1ok?'':flip}</div><div class="vb">${c1ok?`<b>Positive base carry without incentives.</b> ${btcTxt} BTC + ${plusTxt} Plus-stable of un-subsidized borrowable depth (vs one ${wethTxt} WETH pool), and the widest organic spread comes from sUSDe funding${NATIVE.sUSDe?` (${NATIVE.sUSDe.toFixed(2)}% live)`:""}.`:`<b>Changed.</b> Base carry no longer positive on ${b(1)<=0?'#1':''}${b(1)<=0&&b(2)<=0?' and ':''}${b(2)<=0?'#2':''} — the positive-carry finding no longer holds.`}</div></div>
+    <div class="vchip ${c1ok?'good':'lean'}"><div class="vh"><span class="famdot fam-btc"></span>BTC pairs + sUSDe ${c1ok?'':flip}</div><div class="vb">${c1ok?`<b>Positive base carry without incentives.</b> ${btcTxt} BTC + ${plusTxt} Plus-stable of un-subsidized borrowable depth (vs one ${wethTxt} WETH pool), and the only wide organic spread (sUSDe funding).`:`<b>Changed.</b> Base carry no longer positive on ${b(1)<=0?'#1':''}${b(1)<=0&&b(2)<=0?' and ':''}${b(2)<=0?'#2':''} — the positive-carry finding no longer holds.`}</div></div>
     <div class="vchip ${c2rented?'rent':'lean'}"><div class="vh"><span class="famdot fam-stable"></span>Stables ${c2rented===SNAPSIGN.projBase[5]?flip:''}</div><div class="vb">${c2rented?'<b>Incentive-dependent.</b> Green only while Merkl campaigns pay — currently short, weekly-renewed tranches (dates in §04).':(b(6)>=0?'<b>Base turned positive</b> — no longer purely incentive-dependent; re-verify against §04.':'<b>Not green even with incentives</b> — current Merkl campaigns do not flip the sign.')}</div></div>
     <div class="vchip lean"><div class="vh"><span class="famdot fam-eth"></span>ETH pairs ${c3thin?'':flip}</div><div class="vb">${c3thin?`<b>Thin.</b> One shared ${wethTxt} WETH pool; staking ≈ borrow cost, so carry rests on swap fees and one rebate.`:'<b>No longer thin</b> — the wstETH loop base moved above +5%; the thin-carry finding no longer holds.'}</div></div>
     <div class="vchip warn"><div class="vh"><span class="famdot" style="background:var(--t0)"></span>GHO ${ghoRented?'':flip}</div><div class="vb">${ghoRented?'<b>Green on rewards alone.</b> The one live GHO vault (Fluid) is negative ex-reward — no organic comparable exists.':'<b>Changed:</b> Fluid GHO-USDC is now '+(LB.gho.lev>=0?'green even ex-reward':'red with rewards too')+' — the finding no longer holds.'}</div></div>`;
@@ -2058,10 +1869,7 @@ function renderKPIs(){
   const live=SRC.fluid.state==="live";
   /* The count used to read a hard-coded "43 (snap)" over a 10-row snapshot board, implying
      33 vaults had been evaluated and found wanting. Both numbers now come from the same rows. */
-  const funded=LB.all.filter(r=>(r.usd||0)>=DUST_M*1e6).length;
-  document.getElementById("kpi-vaults").textContent=live?`${LB.all.length}`:`${LB.all.length} (subset)`;
-  const vs=document.getElementById("kpi-vaults-sub");
-  if(vs) vs.textContent=live?`${funded} hold more than $${DUST_M}M`:"snapshot subset";
+  document.getElementById("kpi-vaults").textContent=live?LB.all.length:LB.all.length+" (subset)";
   document.getElementById("kpi-greens").textContent=live?LB.all.filter(r=>r.green&&!r.inc).length:"—";
   /* the sources bar directly above already itemises freshness — this tile earns its place by
      showing something the bar cannot: how much of the board leans on a campaign */
@@ -2082,15 +1890,12 @@ const COLS=[
   {k:"src",label:"Engine",sort:r=>r.src},
   {k:"col",label:"TVL",numeric:true},
   {k:"eq",label:"Net equity",numeric:true},
-  {k:"util",label:"Wound",numeric:true},
-  {k:"cap",label:"Cap fill (coll)",numeric:true},
+  {k:"util",label:"Util",numeric:true},
+  {k:"cap",label:"Cap fill",numeric:true},
   {k:"pos",label:"Users",numeric:true},
   {k:"lev",label:"Max Lev APY",numeric:true,anchor:true},
 ];
-/* Default sort is TVL, not APY. APY-descending put USDC-ETH (unverified, swap-fee driven,
-   moved ~20pp within one session) in row 1 — the first and loudest number on the page was
-   also its least trustworthy. Size first; the APY column is one click away. */
-let boardSort={k:"col",dir:-1}, boardFam="all";
+let boardSort={k:"lev",dir:-1}, boardFam="all";
 /* ids currently expanded in the board, and ids the user explicitly un-gated */
 const boardOpen=new Set(), dustOK=new Set();
 const DUST_M=0.5;    /* $M of collateral below which a vault gets a stub, not a full teardown */
@@ -2162,7 +1967,7 @@ function renderBoard(){
         /* Not reward-related: a green vault whose CARRY SPREAD is negative still returns less
            than holding the collateral unlevered, because L·(S−B)+B < S whenever S < B.
            Four vaults on the board look green while leverage is actively costing the holder. */
-        :(r.spread<0)?`<span class="exrew-line${r.green?" flips":""}" title="Supply ${r.unlev.toFixed(2)}% is below the ${(r.unlev-r.spread).toFixed(2)}% net borrow cost, so the carry spread is ${sgn(r.spread,2)}%. Leverage multiplies that negative spread: ${f(r.lev,true)} wound up, versus ${f(r.unlev,true)} just holding the collateral. The gap IS the cost of looping.">${f(r.unlev,true)} unlevered${r.green?" ⚠":""}</span>`:''}</td>
+        :(r.green&&r.spread<0)?`<span class="exrew-line flips" title="Supply ${r.unlev.toFixed(2)}% is below the ${(r.unlev-r.spread).toFixed(2)}% net borrow cost, so the carry spread is ${sgn(r.spread,2)}%. Looping to leverage returns LESS than simply holding the collateral — ${f(r.lev,true)} at leverage vs ${f(r.unlev,true)} unlevered.">${f(r.unlev,true)} unlevered ⚠</span>`:''}</td>
     </tr>${open?`<tr class="exprow" id="exp-${r.id}"><td colspan="${COLS.length}">${expandHTML(r)}</td></tr>`:''}`;
   }).join("");
   const g=LB.gho, isLive=SRC.fluid.state==="live";
@@ -2343,7 +2148,7 @@ function tdHTML(v){
     </div>
   </section>
   <section>
-    <h3 class="sh"><span class="n">03</span>What drives it</h3>
+    <h3 class="sh"><span class="n">03</span>Why it's ${v.verdict}</h3>
     <div class="call">
       <h4>${v.driver}</h4>
       <p>${v.lede}</p>
@@ -2395,7 +2200,7 @@ function renderMethod(){
   <div><b>Reliability labels.</b> <span class="tag r">R</span> read from source (Fluid, Merkl and Aave, live at the last refresh — the freshness bar at the top says which of the four actually landed) · <span class="tag d">D</span> derived, arithmetic shown, recomputed from raw on refresh · <span class="tag na">NA</span> not exposed / not confirmable. Anything that could not be fetched keeps its last good value and is marked STALE, or falls back to the ${SNAPDATE} snapshot and says so — no number is repainted as live when it is not.</div>
   <div><b>Sources.</b> Fluid vaults API <span class="mono">api.fluid.instadapp.io/v2/1/vaults</span> (per-token rates, stakingApr, rewards, reserves→weights). Method reconciled 3/3 against Fluid's own vault pages on 2026-07-15; Net APR / Max Leverage APY confirmed per vault at <span class="mono">fluid.io/vaults/1/{id}/strategies/multiply</span>. Token prices come from the same payload and are used for the USD valuation. Base lending/staking rates drift only a basis point or two intraday, but swap-fee-driven APYs move far more — marked ⇅; WBTC-cbBTC, USDC-ETH and reUSD-USDT each swung materially within the snapshot day.</div>
   <div><b>Method.</b> Each side is weighted by its OWN token mix (mirrored on self-loops); engine signs per the legend above. Loop: Supply·L − Borrow·(L−1), L = 1/(1−CF). USD valuation via vault shares × per-share reserves × price. wstETH-debt study replaces the debt token's true ETH-terms cost (0.13% interest + 2.21% staking) with plain ETH (2.25% interest), holding leverage constant.</div>
-  <div><b>Aave v4 data — now live.</b> Hub rates, borrowable depth, collateral factors and frozen/borrowable flags come from Aave's own public GraphQL API, <span class="mono">api.aave.com/graphql</span> — no key, CORS-open, and the same backend app.aave.com reads. Three queries per refresh: <span class="mono">hubs</span> (the four Ethereum hubs), <span class="mono">hubAssets</span> per hub (borrow APY, utilization, available liquidity in USD) and <span class="mono">reserves</span> (per-spoke collateral factor, borrowable/collateral flags, frozen status). Rates arrive as decimal fractions and are scaled ×100 here. This replaces the hand-scraped tokenlogic/pro.aave snapshot the page previously carried${ABORROW["Core|USDT"]?` — those numbers had drifted materially (Core USDT borrow was 3.98% at the ${SNAPDATE} scrape, and reads ${ABORROW["Core|USDT"].apy.toFixed(2)}% right now)`:" (live comparison pending — the Aave fetch has not landed this session)"}. <b>Collateral factor is spoke-scoped, not hub-wide</b> — the same asset carries different CFs on different spokes. Cross-checked independently against direct <span class="mono">eth_call</span> reads of the hub contracts, which agreed to the basis point. Merkl incentives from <span class="mono">api.merkl.xyz/v4/opportunities</span> (status=LIVE) are likewise live. <b>Supply legs are live too.</b> Each is Aave's own <span class="mono">supplyApy</span> for that reserve plus the token's native yield from Fluid's <span class="mono">stakingApr</span>. The two are disjoint, not double-counted: across every hub asset with real utilisation, Aave's supplyApy equals borrowApy × utilisation exactly, leaving no room for the token's own appreciation — and every appreciating wrapper (wstETH, weETH, sUSDe, LBTC) reads exactly 0.0000% on Aave at 0% utilisation while Fluid reports 2.20 / 2.89 / 3.86 / 0.33%. The pair is equal-weighted, which is an assumption about a proposed structure, not a measurement. LBTC's Lombard points have no live source and stay unpriced.</div>
+  <div><b>Aave v4 data — now live.</b> Hub rates, borrowable depth, collateral factors and frozen/borrowable flags come from Aave's own public GraphQL API, <span class="mono">api.aave.com/graphql</span> — no key, CORS-open, and the same backend app.aave.com reads. Three queries per refresh: <span class="mono">hubs</span> (the four Ethereum hubs), <span class="mono">hubAssets</span> per hub (borrow APY, utilization, available liquidity in USD) and <span class="mono">reserves</span> (per-spoke collateral factor, borrowable/collateral flags, frozen status). Rates arrive as decimal fractions and are scaled ×100 here. This replaces the hand-scraped tokenlogic/pro.aave snapshot the page previously carried${ABORROW["Core|USDT"]?` — those numbers had drifted materially (Core USDT borrow was 3.98% at the ${SNAPDATE} scrape, and reads ${ABORROW["Core|USDT"].apy.toFixed(2)}% right now)`:" (live comparison pending — the Aave fetch has not landed this session)"}. <b>Collateral factor is spoke-scoped, not hub-wide</b> — the same asset carries different CFs on different spokes. Cross-checked independently against direct <span class="mono">eth_call</span> reads of the hub contracts, which agreed to the basis point. Merkl incentives from <span class="mono">api.merkl.xyz/v4/opportunities</span> (status=LIVE) are likewise live. Collateral yields on the supply legs remain issuer-native external estimates — they accrue off Aave's book, and are labelled as approximate and variable.</div>
   <div><b>Live layer.</b> "Refresh from source" re-fetches raw inputs (Fluid per-token rates, stakingApr, rewards, per-share reserves, prices, positions, DEX share caps; Merkl LIVE campaign APRs + end dates; Aave v4 hub rates, depth and collateral factors; Ethereum block via public RPC) and recomputes every derived value in-page — nothing derived is repainted from storage. <b>Engine classification</b> describes whichever term dominates the decomposition, independent of the sign of the result: Incentive if rewards flip the sign or are worth ≥ max(2pp, 50% of |Max Lev APY|); Native yield if the collateral staking contribution beats fees; Swap fees (⇅) if the fee contribution ≥ max(1pp, 25% of |Max Lev APY|); else Base carry. A red vault can therefore be labelled "Native yield" or "Swap fees" — the label names the driver, the colour and the number carry the sign. <b>Cap-fill</b> = DEX totalShares/maxShares, and is "—" on a side with no DEX pool rather than 0%. Fee comparables for the §03 projection table are the live v51 (BTC pair) and v44 (ETH pair) trading APRs, applied per side. Verdict rules re-evaluate after each recompute; any sign that differs from the ${SNAPDATE} snapshot is flagged "flipped". On fetch failure the last good values are kept and the source is marked STALE. Merkl's CORS accepts file:// and https origins but rejects plain <span class="mono">http://localhost</span>, and rate-limits bursts (HTTP 429) — a STALE Merkl flag usually clears on the next refresh, and one deferred retry fires automatically. Figures are gross of impermanent loss, entry slippage and liquidation; nothing here is financial advice.</div>`;
 }
 
