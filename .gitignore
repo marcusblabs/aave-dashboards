@@ -1,0 +1,3 @@
+# local tooling state — browse/audit logs, not part of the site
+.gstack/
+.DS_Store

@@ -1,210 +1,383 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Aave v4 Tokenization Spoke Caps</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Theme bootstrap: blocking and FIRST, so a light-theme user never sees a dark flash.
+     Must stay ahead of every stylesheet. The toggle handler lives in nav.js. -->
+<script>try{if(localStorage.getItem('le-theme')==='light')document.documentElement.dataset.theme='light'}catch(e){}</script>
+<script defer src="../nav.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://api.fontshare.com" crossorigin>
+<link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<title>Spoke Caps · Aave v4 Dashboards</title>
 <style>
   :root {
-    --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
-
-    /* cool-neutral ground, picked with a faint indigo bias */
-    --bg: #f4f5f8;
-    --surface: #ffffff;
-    --surface-2: #eef0f4;
-    --border: #dfe2ea;
-    --border-strong: #cbd0dc;
-    --ink: #1b1e27;
-    --muted: #626878;
-    --faint: #8b91a1;
-
-    --accent: #4f46e5;      /* indigo, interactive only */
-    --accent-ink: #ffffff;
-
-    /* semantic fill bands — distinct from the accent */
-    --open: #0f9d8c;        /* teal = headroom */
-    --open-bg: #d8f3ee;
-    --filling: #c77400;     /* amber = filling up */
-    --filling-bg: #faedd2;
-    --full: #d23b3b;        /* red = at cap */
-    --full-bg: #fadedd;
-    --off: #9aa0b0;         /* disabled */
-    --off-bg: #eceef2;
-
-    --eth: #6572e6;
-    --avax: #e84142;
-
-    --track: #e7e9f0;
-    --shadow: 0 1px 2px rgba(20,24,40,.05), 0 1px 1px rgba(20,24,40,.04);
-    --radius: 10px;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #0c0e13;
-      --surface: #14171e;
-      --surface-2: #1a1e27;
-      --border: #262b36;
-      --border-strong: #333a48;
-      --ink: #e7e9ee;
-      --muted: #9198a8;
-      --faint: #6b7182;
-      --accent: #7c78f0;
-      --accent-ink: #0c0e13;
-      --open: #34d4bf; --open-bg: #0e2b28;
-      --filling: #f0a83a; --filling-bg: #2e2413;
-      --full: #f26d6d; --full-bg: #2e1717;
-      --off: #565d6e; --off-bg: #1b1f28;
-      --eth: #8a95f5;
-      --avax: #ff5a5b;
-      --track: #232833;
-      --shadow: 0 1px 2px rgba(0,0,0,.4);
-    }
+    --bg:          #383e47;
+    --bg-elev:     #3f4650;
+    --bg-elev-2:   #464d58;
+    --bg-hover:    #464d58;
+    --border:      rgba(255,255,255,0.08);
+    --border-strong: rgba(255,255,255,0.16);
+    --panel-border: rgba(255,255,255,0.09);
+    --input-border:#535d6a;
+    --text:        rgba(255,255,255,0.92);
+    --text-dim:    #c2cbd8;
+    --text-mute:   #b3bdcc;
+    --primary:     #7f6ae8;
+    --primary-dim: #6b54e0;
+    --primary-hov: #b3aef5;
+    --primary-soft:rgba(127, 106, 232, 0.12);
+    --primary-bord:rgba(127, 106, 232, 0.30);
+    --accent:      #eaa879;
+    --accent-soft: rgba(234,168,121,0.12);
+    --pos:         #63f2be;
+    --pos-soft:    rgba(99,242,190,0.12);
+    --neg:         #f9b5a8;
+    --neg-soft:    rgba(249,181,168,0.12);
+    --slate:       #8b97ac;
+    --slate-soft:  rgba(139,151,172,0.14);
+    --track:       rgba(255,255,255,0.07);
+    --eth:         #8a95f5;
+    --avax:        #ff5a5b;
+    --radius:      8px;
+    --radius-sm:   6px;
+    --font-sans:   'Satoshi', -apple-system, 'Segoe UI', sans-serif;
+    --font-mono:   'JetBrains Mono', 'SF Mono', ui-monospace, monospace;
+    --card-shadow: 0 0 0 1px rgba(0,0,0,.02), 1px 1px 1px -.5px rgba(0,0,0,.06), 3px 3px 3px -1.5px rgba(0,0,0,.06), 6px 6px 6px -3px rgba(0,0,0,.06), 12px 12px 12px -6px rgba(0,0,0,.06), 24px 24px 24px -12px rgba(0,0,0,.1), -.5px -1px 0 0 rgba(255,255,255,.15);
+    --glow:        rgba(127, 106, 232, 0.10);
+    --row-hover:   rgba(127,106,232,0.04);
   }
   :root[data-theme="light"] {
-    --bg: #f4f5f8; --surface: #ffffff; --surface-2: #eef0f4; --border: #dfe2ea;
-    --border-strong: #cbd0dc; --ink: #1b1e27; --muted: #626878; --faint: #8b91a1;
-    --accent: #4f46e5; --accent-ink: #ffffff;
-    --open: #0f9d8c; --open-bg: #d8f3ee; --filling: #c77400; --filling-bg: #faedd2;
-    --full: #d23b3b; --full-bg: #fadedd; --off: #9aa0b0; --off-bg: #eceef2;
-    --eth: #6572e6; --avax: #e84142; --track: #e7e9f0; --shadow: 0 1px 2px rgba(20,24,40,.05);
-  }
-  :root[data-theme="dark"] {
-    --bg: #0c0e13; --surface: #14171e; --surface-2: #1a1e27; --border: #262b36;
-    --border-strong: #333a48; --ink: #e7e9ee; --muted: #9198a8; --faint: #6b7182;
-    --accent: #7c78f0; --accent-ink: #0c0e13;
-    --open: #34d4bf; --open-bg: #0e2b28; --filling: #f0a83a; --filling-bg: #2e2413;
-    --full: #f26d6d; --full-bg: #2e1717; --off: #565d6e; --off-bg: #1b1f28;
-    --eth: #8a95f5; --avax: #ff5a5b; --track: #232833; --shadow: 0 1px 2px rgba(0,0,0,.4);
+    --bg:          #eef0f4;
+    --bg-elev:     #f8f9fb;
+    --bg-elev-2:   #e5e8ee;
+    --bg-hover:    #e5e8ee;
+    --border:      rgba(20,26,38,0.09);
+    --border-strong: rgba(20,26,38,0.18);
+    --panel-border: rgba(20,26,38,0.10);
+    --input-border:#c3cad6;
+    --text:        #232833;
+    --text-dim:    #454e5e;
+    --text-mute:   #5b6575;
+    --primary:     #6b54e0;
+    --primary-dim: #5a43cf;
+    --primary-hov: #5a43cf;
+    --primary-soft:rgba(107, 84, 224, 0.10);
+    --primary-bord:rgba(107, 84, 224, 0.30);
+    --accent:      #a05a24;
+    --accent-soft: rgba(192,122,62,0.12);
+    --pos:         #0a7a55;
+    --pos-soft:    rgba(14,158,112,0.11);
+    --neg:         #bc4531;
+    --neg-soft:    rgba(207,88,67,0.11);
+    --slate:       #667185;
+    --slate-soft:  rgba(102,113,133,0.12);
+    --track:       rgba(20,26,38,0.08);
+    --eth:         #6572e6;
+    --avax:        #e84142;
+    --card-shadow: 0 1px 2px rgba(20,26,38,.06), 0 4px 14px rgba(20,26,38,.05);
+    --glow:        rgba(107, 84, 224, 0.07);
+    --row-hover:   rgba(107,84,224,0.05);
   }
 
-  * { box-sizing: border-box; }
-  html { -webkit-text-size-adjust: 100%; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
-    margin: 0; background: var(--bg); color: var(--ink);
     font-family: var(--font-sans);
-    font-size: 15px; line-height: 1.5;
+    background: var(--bg); color: var(--text);
+    min-height: 100vh; font-size: 14px; line-height: 1.45;
     -webkit-font-smoothing: antialiased;
   }
-  .wrap { max-width: 1120px; margin: 0 auto; padding: 32px 24px 64px; }
-
-  /* header */
-  header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 28px; }
-  .titles h1 { font-size: 22px; font-weight: 650; letter-spacing: -.01em; margin: 0 0 4px; text-wrap: balance; }
-  .titles p { margin: 0; color: var(--muted); font-size: 13.5px; }
-  .titles p b { color: var(--ink); font-weight: 600; }
-
-  .controls { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
-  button.refresh {
-    font-family: var(--font-sans); font-size: 14px; font-weight: 600;
-    color: var(--accent-ink); background: var(--accent);
-    border: none; border-radius: 8px; padding: 10px 18px; cursor: pointer;
-    display: inline-flex; align-items: center; gap: 9px;
-    transition: filter .15s ease, opacity .15s ease;
+  body::before {
+    content: ''; position: fixed;
+    top: -200px; left: 50%; transform: translateX(-50%);
+    width: 800px; height: 600px;
+    background: radial-gradient(ellipse, var(--glow) 0%, transparent 70%);
+    pointer-events: none; z-index: 0;
   }
-  button.refresh:hover { filter: brightness(1.07); }
-  button.refresh:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  button.refresh:disabled { opacity: .6; cursor: progress; }
-  .spinner { width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; display: none; }
-  button.refresh.loading .spinner { display: inline-block; animation: spin .7s linear infinite; }
-  button.refresh.loading .lbl-idle { display: none; }
-  .lbl-load { display: none; }
-  button.refresh.loading .lbl-load { display: inline; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .status { font-family: var(--font-mono); font-size: 11.5px; color: var(--faint); text-align: right; }
-  .status .dot { color: var(--open); }
+  .app { position: relative; z-index: 1; }
+  a { color: inherit; text-decoration: none; }
+  .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
-  /* summary strip */
-  .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 30px; }
-  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); }
-  .stat .k { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 7px; }
-  .stat .v { font-family: var(--font-mono); font-size: 21px; font-weight: 600; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
-  .stat .sub { font-size: 12px; color: var(--faint); margin-top: 3px; }
-  .stat .v.warn { color: var(--full); }
+  /* ============ TOP BAR ============ */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 16px;
+    padding: 18px 28px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-elev);
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand .logo {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dim));
+    display: grid; place-items: center;
+    color: #fff; font-weight: 900; font-size: 13px;
+    box-shadow: 0 4px 20px color-mix(in srgb, var(--primary) 30%, transparent);
+  }
+  .brand h1 {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.3px;
+    background: linear-gradient(90deg, #b3aef5 0%, #d7cbe7 25%, #e5c8c8 50%, #eaa879 100%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
+  }
+  :root[data-theme="light"] .brand h1 {
+    background: linear-gradient(90deg, #5a43cf 0%, #7a55b8 45%, #c07a3e 100%);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
+  }
+  .brand .sub { color: var(--text-mute); font-size: 12px; margin-top: 1px; }
+  .topbar .right { display: flex; align-items: center; gap: 14px; color: var(--text-mute); font-size: 12px; flex-wrap: wrap; }
+  .topbar .right .stat-time { color: var(--text-dim); font-family: var(--font-mono); }
 
-  /* chain section */
-  .chain { margin-bottom: 34px; }
-  .chain-head { display: flex; align-items: center; gap: 10px; margin: 0 2px 12px; }
+  .btn {
+    background: var(--bg-elev); border: 1px solid var(--input-border); color: var(--text);
+    padding: 0 16px; height: 38px; border-radius: var(--radius);
+    font-family: inherit; font-size: 13px; font-weight: 500; cursor: pointer;
+    transition: background .15s, border-color .15s, color .15s;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .btn:hover { background: var(--bg-hover); border-color: var(--text-mute); }
+  .btn:disabled { opacity: .4; cursor: progress; }
+  .btn.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .btn.primary:hover { background: var(--primary-dim); border-color: var(--primary-dim); }
+  .btn.ghost { background: transparent; }
+  .btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+  .spin {
+    width: 13px; height: 13px; border: 2px solid currentColor; border-right-color: transparent;
+    border-radius: 50%; display: none; flex: none;
+  }
+  .btn.loading .spin { display: inline-block; animation: rspin .7s linear infinite; }
+  @keyframes rspin { to { transform: rotate(360deg); } }
+
+  /* ============ SOURCES BAR ============ */
+  .sources-bar { padding: 12px 28px; background: var(--bg); border-bottom: 1px solid var(--border); }
+  .srcline {
+    display: flex; flex-wrap: wrap; gap: 6px 18px;
+    font-family: var(--font-mono); font-size: 11.5px; color: var(--text-mute);
+    align-items: center; max-width: 1160px; margin: 0 auto;
+  }
+  .srcline .src { display: inline-flex; align-items: center; gap: 6px; }
+  .srcline .sdot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex: none; }
+  .sdot.live { background: var(--pos); } .sdot.stale { background: var(--accent); }
+  .sdot.err  { background: var(--neg); }  .sdot.wait  { background: var(--slate); opacity: .4; }
+
+  /* ============ KPI STRIP ============ */
+  .kpi-strip {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px;
+    background: var(--border); border-bottom: 1px solid var(--border);
+  }
+  .kpi { padding: 18px 22px; background: var(--bg); }
+  .kpi .label { font-size: 11px; color: var(--text-mute); text-transform: uppercase; letter-spacing: .6px; font-weight: 500; }
+  .kpi .val {
+    font-size: 22px; font-weight: 600; color: var(--text); margin-top: 6px;
+    letter-spacing: -.5px; font-variant-numeric: tabular-nums; font-family: var(--font-mono);
+  }
+  .kpi .val.primary { color: var(--pos); }
+  .kpi .val.warn { color: var(--neg); }
+  .kpi .sub { font-size: 11.5px; color: var(--text-mute); margin-top: 3px; }
+  .kpi[title] { cursor: help; }
+
+  /* ============ SHELL + SECTIONS ============ */
+  .shell { max-width: 1160px; margin: 0 auto; padding: 0 28px; }
+  section.block { padding: 26px 0; border-bottom: 1px solid var(--border); }
+  section.block:last-of-type { border-bottom: none; }
+  .block-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .block-head .lhs { display: flex; align-items: center; gap: 10px; }
+  .block-head h2 { font-size: 17px; font-weight: 700; letter-spacing: -.2px; }
+  .block-head .note { color: var(--text-mute); font-size: 12px; font-family: var(--font-mono); }
+
   .mark { width: 11px; height: 11px; flex: none; }
   .mark.eth { background: var(--eth); transform: rotate(45deg); border-radius: 2px; }
   .mark.avax { width: 0; height: 0; background: none; border-left: 7px solid transparent; border-right: 7px solid transparent; border-bottom: 12px solid var(--avax); }
-  .chain-head h2 { font-size: 15px; font-weight: 650; margin: 0; }
-  .chain-head .meta { font-family: var(--font-mono); font-size: 11.5px; color: var(--faint); margin-left: auto; text-align: right; }
 
-  .rows { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
-  .row { display: grid; grid-template-columns: 148px 1fr 132px 96px; align-items: center; gap: 16px; padding: 13px 18px; border-top: 1px solid var(--border); }
+  /* ============ WRAPPER ROWS ============ */
+  .rows {
+    background: var(--bg-elev); border: 1px solid var(--panel-border);
+    border-radius: var(--radius); overflow: hidden; box-shadow: var(--card-shadow);
+  }
+  .row {
+    display: grid; grid-template-columns: 168px 1fr 148px 92px;
+    align-items: center; gap: 18px;
+    padding: 13px 18px; border-top: 1px solid var(--border);
+    transition: background .12s;
+  }
   .row:first-child { border-top: none; }
+  .row:hover { background: var(--row-hover); }
   .row .name { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-  .row .sym { font-weight: 600; font-size: 14px; }
-  .row .addr { font-family: var(--font-mono); font-size: 10.5px; color: var(--faint); cursor: pointer; width: fit-content; }
-  .row .addr:hover { color: var(--accent); }
+  .row .sym { font-weight: 600; font-size: 13.5px; }
+  .row .addr {
+    font-family: var(--font-mono); font-size: 10.5px; color: var(--text-mute);
+    cursor: pointer; width: fit-content; border-bottom: 1px dotted transparent;
+  }
+  .row .addr:hover { color: var(--primary-hov); border-bottom-color: var(--primary-bord); }
 
+  /* cap-fill bar */
   .barcell { min-width: 0; }
-  .bar { position: relative; height: 22px; background: var(--track); border-radius: 5px; overflow: hidden; }
-  .bar .fill { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: 5px 0 0 5px; transition: width .6s cubic-bezier(.4,0,.2,1); }
-  .fill.open { background: var(--open); } .fill.filling { background: var(--filling); } .fill.full { background: var(--full); }
-  .bar .pct { position: absolute; right: 8px; top: 0; height: 100%; display: flex; align-items: center; font-family: var(--font-mono); font-size: 11px; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .capbar { position: relative; height: 22px; background: var(--track); border-radius: var(--radius-sm); overflow: hidden; }
+  .capbar .fill { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: var(--radius-sm) 0 0 var(--radius-sm); transition: width .6s cubic-bezier(.4,0,.2,1); }
+  .fill.open { background: var(--pos); } .fill.filling { background: var(--accent); } .fill.full { background: var(--neg); }
+  .capbar .pct {
+    position: absolute; right: 8px; top: 0; height: 100%; display: flex; align-items: center;
+    font-family: var(--font-mono); font-size: 11px; font-variant-numeric: tabular-nums; color: var(--text-dim);
+  }
+  .capbar.empty { background: transparent; border: 1px dashed var(--border-strong); }
 
   .nums { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-  .nums .supplied { font-size: 13px; font-weight: 600; }
-  .nums .cap { font-size: 11px; color: var(--faint); }
-  .nums .avail { font-size: 12px; }
-  .nums .avail b { font-weight: 600; }
+  .nums .supplied { font-size: 13px; font-weight: 600; color: var(--text); }
+  .nums .cap { font-size: 10.5px; color: var(--text-mute); }
+  .nums .avail { font-size: 11.5px; color: var(--text-mute); }
+  .nums .avail b { font-weight: 600; color: var(--text-dim); }
 
-  .pill { justify-self: end; font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
-  .pill.open { color: var(--open); background: var(--open-bg); }
-  .pill.filling { color: var(--filling); background: var(--filling-bg); }
-  .pill.full { color: var(--full); background: var(--full-bg); }
-  .pill.err { color: var(--full); background: var(--full-bg); }
+  .pill {
+    justify-self: end; font-family: var(--font-mono);
+    font-size: 10px; font-weight: 600; padding: 2px 9px; border-radius: 999px;
+    letter-spacing: .04em; text-transform: uppercase; white-space: nowrap;
+  }
+  .pill.open    { color: var(--pos);   background: var(--pos-soft); }
+  .pill.filling { color: var(--accent);background: var(--accent-soft); }
+  .pill.full    { color: var(--neg);   background: var(--neg-soft); }
+  .pill.err     { color: var(--neg);   background: var(--neg-soft); }
+  .pill.off     { color: var(--slate); background: var(--slate-soft); }
 
-  /* disabled block */
-  .disabled { padding: 12px 18px; border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; align-items: center; gap: 8px; background: var(--surface-2); }
-  .disabled .lab { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); margin-right: 4px; }
-  .chip { font-family: var(--font-mono); font-size: 11px; color: var(--off); background: var(--off-bg); border: 1px solid var(--border); padding: 2px 8px; border-radius: 6px; }
+  .disabled-strip {
+    padding: 11px 18px; border-top: 1px solid var(--border);
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px; background: var(--bg-elev-2);
+  }
+  .disabled-strip .lab { font-family: var(--font-mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-mute); margin-right: 4px; }
+  .chip {
+    font-family: var(--font-mono); font-size: 11px; color: var(--slate);
+    background: var(--slate-soft); border: 1px solid var(--border);
+    padding: 2px 8px; border-radius: var(--radius-sm);
+  }
 
-  footer { margin-top: 34px; color: var(--faint); font-size: 12px; line-height: 1.6; }
-  footer code { font-family: var(--font-mono); font-size: 11px; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
-  a { color: var(--accent); }
+  /* ============ METHOD + FOOTER ============ */
+  .method {
+    font-size: 13px; color: var(--text-mute); line-height: 1.65;
+    background: var(--bg-elev); border: 1px solid var(--panel-border);
+    border-left: 3px solid var(--primary); border-radius: var(--radius);
+    padding: 15px 18px; box-shadow: var(--card-shadow);
+  }
+  .method b { color: var(--text-dim); }
+  .method > div { margin-bottom: 8px; }
+  .method > div:last-child { margin-bottom: 0; }
+  .method code { font-family: var(--font-mono); font-size: 11.5px; background: var(--bg-elev-2); padding: 1px 5px; border-radius: 4px; }
 
-  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--ink); color: var(--bg); font-size: 13px; padding: 8px 16px; border-radius: 8px; opacity: 0; pointer-events: none; transition: all .2s ease; }
+  .footer {
+    padding: 14px 28px; border-top: 1px solid var(--border); background: var(--bg-elev);
+    color: var(--text-mute); font-size: 11.5px;
+    display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  }
+  .footer a { color: var(--text-dim); }
+  .footer a:hover { color: var(--primary-hov); }
+
+  .toast {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--bg-elev-2); color: var(--text); border: 1px solid var(--border-strong);
+    font-size: 13px; padding: 9px 16px; border-radius: var(--radius);
+    box-shadow: var(--card-shadow); opacity: 0; pointer-events: none;
+    transition: opacity .2s ease, transform .2s ease; z-index: 200;
+  }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-  @media (max-width: 720px) {
-    .summary { grid-template-columns: repeat(2, 1fr); }
-    .row { grid-template-columns: 1fr 108px; grid-template-areas: "name pill" "bar bar" "nums nums"; gap: 10px; }
-    .row .name { grid-area: name; } .barcell { grid-area: bar; } .nums { grid-area: nums; text-align: left; } .pill { grid-area: pill; }
-    header { flex-direction: column; align-items: stretch; } .controls { align-items: stretch; } .status { text-align: left; }
+  /* ============ RESPONSIVE ============ */
+  @media (max-width: 900px) {
+    body::before { display: none; }
+    .topbar { padding: 14px 16px; }
+    .sources-bar { padding: 10px 16px; }
+    .kpi-strip { grid-template-columns: repeat(2, 1fr); }
+    .kpi { padding: 14px; } .kpi .val { font-size: 18px; }
+    .shell { padding: 0 16px; }
+    .row { grid-template-columns: 1fr 104px; grid-template-areas: "name pill" "bar bar" "nums nums"; gap: 10px; }
+    .row .name { grid-area: name; } .barcell { grid-area: bar; }
+    .nums { grid-area: nums; text-align: left; } .pill { grid-area: pill; justify-self: end; }
+    .footer { padding: 12px 16px; }
   }
-  @media (prefers-reduced-motion: reduce) { .bar .fill { transition: none; } .spinner { animation-duration: 2s; } }
+  @media (max-width: 520px) { .brand .sub { display: none; } }
+  @media (prefers-reduced-motion: reduce) { .capbar .fill { transition: none; } .spin { animation-duration: 2s; } }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <div class="titles">
-      <a href="../" style="font-size:12px;color:var(--muted);text-decoration:none;display:inline-block;margin-bottom:6px">&larr; Aave Dashboards</a>
-      <h1>Aave v4 Tokenization Spoke Caps</h1>
-      <p>Live deposit-cap headroom on the <b>waCore*</b> ERC-4626 wrappers &middot; Ethereum &amp; Avalanche Core Hubs</p>
-    </div>
-    <div class="controls">
-      <button class="refresh" id="refresh" type="button">
-        <span class="spinner" aria-hidden="true"></span>
-        <span class="lbl-idle">Refresh from chain</span>
-        <span class="lbl-load">Reading chains&hellip;</span>
-      </button>
-      <div class="status" id="status">Loading&hellip;</div>
-    </div>
-  </header>
+<div class="app">
 
-  <section class="summary" id="summary"></section>
-  <div id="chains"></div>
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="brand">
+      <div>
+        <h1>Tokenization Spoke Caps</h1>
+        <div class="sub">waCore* ERC-4626 wrapper headroom · Ethereum &amp; Avalanche Core Hubs</div>
+      </div>
+    </div>
+    <div class="right">
+      <button class="btn ghost" id="themebtn" type="button" aria-label="Toggle light/dark theme">◐</button>
+      <button class="btn primary" id="refreshbtn" type="button"><span class="spin" aria-hidden="true"></span><span>Refresh from chain</span></button>
+    </div>
+  </div>
 
-  <footer>
-    Reads <code>getSpokeConfig</code>, <code>totalAssets</code> and <code>maxDeposit</code> directly from each Core Hub over public RPC.
-    Caps are governance-set per spoke; <b>available</b> is the room left before the cap. Figures in native token units
-    (stablecoins &asymp; $1; AVAX / BTC / ETH are not). Nothing here is financial advice.
-    Click any address to copy. Spoke set embedded from a hub scan on 2026-07-15 &mdash; regenerate with <code>aave_v4_spoke_caps.py</code>.
-  </footer>
+  <!-- PER-SOURCE FRESHNESS -->
+  <div class="sources-bar">
+    <div class="srcline" id="srcline">
+      <span class="src"><span class="sdot wait"></span>Ethereum: loading…</span>
+      <span class="src"><span class="sdot wait"></span>Avalanche: loading…</span>
+    </div>
+  </div>
+
+  <!-- KPI STRIP -->
+  <div class="kpi-strip">
+    <div class="kpi" title="Wrappers that are active, not halted and not cap-zero">
+      <div class="label">Live wrappers</div>
+      <div class="val" id="kpi-live">—</div>
+      <div class="sub">across Ethereum + Avalanche</div>
+    </div>
+    <div class="kpi" title="Room left before the deposit cap on $-pegged wrappers, summed in token units (≈ $1 each)">
+      <div class="label">Stablecoin headroom</div>
+      <div class="val primary" id="kpi-head">—</div>
+      <div class="sub" id="kpi-head-sub">room left on $-pegged wrappers</div>
+    </div>
+    <div class="kpi" title="The capped wrapper closest to its deposit cap">
+      <div class="label">Fullest wrapper</div>
+      <div class="val" id="kpi-full">—</div>
+      <div class="sub" id="kpi-full-sub">—</div>
+    </div>
+    <div class="kpi" title="Mean fill across wrappers that have a finite cap set">
+      <div class="label">Avg fill (capped)</div>
+      <div class="val" id="kpi-avg">—</div>
+      <div class="sub" id="kpi-avg-sub">—</div>
+    </div>
+  </div>
+
+  <div class="shell">
+    <div id="chains"></div>
+
+    <section class="block" aria-label="Method and caveats">
+      <div class="block-head"><div class="lhs"><h2>Method &amp; caveats</h2></div></div>
+      <div class="method">
+        <div><b>What is read.</b> For each wrapper the page calls <code>getSpokeConfig(assetId, spoke)</code> on the
+          Core Hub for the deposit cap and the active/halted flags, plus <code>totalAssets()</code> and
+          <code>maxDeposit(address)</code> on the ERC-4626 wrapper itself. All three are <code>eth_call</code> at
+          <code>latest</code> over public RPC, in your browser — no backend, no API key.</div>
+        <div><b>How to read it.</b> Caps are governance-set per spoke. <b>Available</b> is the room left before the
+          cap, as the wrapper itself reports it. Bands: <b>open</b> under 40% filled, <b>filling</b> 40–90%,
+          <b>at cap</b> above 90%. A wrapper with a cap of <code>2^40−1</code> is shown as <b>uncapped</b>; one with a
+          cap of 0 is listed as disabled.</div>
+        <div><b>Units.</b> Figures are in native token units, not dollars — stablecoins are ≈&nbsp;$1, but AVAX, BTC
+          and ETH are not, so the stablecoin-headroom KPI sums only the $-pegged wrappers.</div>
+        <div><b>Spoke set.</b> The wrapper list is embedded from a hub scan on <b>2026-07-15</b> — a spoke listed
+          after that date will not appear until the list is regenerated with <code>aave_v4_spoke_caps.py</code>.
+          Every number attached to a listed spoke is live. Click any address to copy it.</div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div class="footer">
+  <span>Read live from the Aave v4 Core Hubs over public RPC (<a href="https://ethereum-rpc.publicnode.com" target="_blank" rel="noopener">publicnode</a> · <a href="https://api.avax.network/ext/bc/C/rpc" target="_blank" rel="noopener">avax</a>) · not affiliated with Aave · nothing here is financial advice</span>
+  <span>
+    <a href="https://github.com/marcusblabs/aave-dashboards" target="_blank" rel="noopener">View source</a>
+    · <a href="../">All dashboards</a>
+  </span>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -269,7 +442,7 @@ async function rpc(rpcs, method, params) {
 const ethCall = (rpcs, to, data) => rpc(rpcs, "eth_call", [{ to, data }, "latest"]);
 
 function fmt(x, dp) {
-  if (x === null) return "-";
+  if (x === null || x === undefined) return "—";
   const opts = x >= 1000 || x === Math.floor(x)
     ? { maximumFractionDigits: 0 }
     : { maximumFractionDigits: dp <= 6 ? 2 : 4 };
@@ -307,29 +480,29 @@ async function readChain(chain) {
 
 function statusText(r) {
   if (r.error) return { cls:"err", txt:"read error" };
-  if (r.disabled) return { cls:"", txt:"disabled" };
+  if (r.disabled) return { cls:"off", txt:"disabled" };
   if (r.halted) return { cls:"full", txt:"halted" };
   if (!r.active) return { cls:"filling", txt:"inactive" };
+  if (r.pct === null) return { cls:"open", txt:"uncapped" };
   const b = band(r.pct);
   return { cls:b, txt: b === "full" ? "at cap" : b === "filling" ? "filling" : "open" };
 }
 
 function rowHTML(r) {
-  const ex = HUBS[r.chain].explorer + r.spoke;
   const short = r.spoke.slice(0,6) + "…" + r.spoke.slice(-4);
   const st = statusText(r);
   if (r.error) {
     return `<div class="row"><div class="name"><span class="sym">${r.symbol}</span>
       <span class="addr" data-a="${r.spoke}" title="${r.spoke}">${short}</span></div>
-      <div class="barcell"><div class="bar"></div></div>
+      <div class="barcell"><div class="capbar empty"></div></div>
       <div class="nums"><div class="cap">${r.error}</div></div>
       <span class="pill err">error</span></div>`;
   }
   const b = band(r.pct || 0);
   const pctTxt = r.pct === null ? "" : (r.pct >= 99.9 && r.pct < 100 ? "99.99%" : r.pct.toFixed(r.pct < 10 ? 2 : 1) + "%");
-  const bar = r.disabled
-    ? `<div class="bar"></div>`
-    : `<div class="bar"><div class="fill ${b}" style="width:${(r.pct||0).toFixed(2)}%"></div><span class="pct">${pctTxt}</span></div>`;
+  const bar = (r.disabled || r.pct === null)
+    ? `<div class="capbar empty"><span class="pct">${r.disabled ? "" : "no cap set"}</span></div>`
+    : `<div class="capbar"><div class="fill ${b}" style="width:${r.pct.toFixed(2)}%"></div><span class="pct">${pctTxt}</span></div>`;
   const capTxt = r.uncapped ? "uncapped" : "cap " + fmt(r.addCap, r.decimals);
   return `<div class="row">
     <div class="name"><span class="sym">${r.symbol}</span>
@@ -350,32 +523,46 @@ function chainHTML(chain, data) {
   const disabled = data.rows.filter(r => !r.error && r.disabled);
   active.sort((a,b) => (b.addCap||0) - (a.addCap||0) || (b.supplied - a.supplied));
   const disabledHTML = disabled.length
-    ? `<div class="disabled"><span class="lab">Disabled &middot; cap 0</span>${disabled.map(r => `<span class="chip">${r.symbol}</span>`).join("")}</div>`
+    ? `<div class="disabled-strip"><span class="lab">Disabled · cap 0</span>${disabled.map(r => `<span class="chip">${r.symbol}</span>`).join("")}</div>`
     : "";
-  return `<section class="chain">
-    <div class="chain-head"><span class="mark ${mark}"></span><h2>${label}</h2>
-      <span class="meta">block ${data.block.toLocaleString()} &middot; ${active.length} live &middot; ${disabled.length} off</span></div>
+  return `<section class="block" aria-label="${label}">
+    <div class="block-head">
+      <div class="lhs"><span class="mark ${mark}"></span><h2>${label}</h2></div>
+      <span class="note">block ${data.block.toLocaleString()} · ${active.length} live · ${disabled.length} off</span>
+    </div>
     <div class="rows">${active.map(rowHTML).join("")}${disabledHTML}</div>
   </section>`;
 }
 
-function summaryHTML(all) {
+function paintKPIs(all) {
   const rows = [].concat(...Object.values(all).map(d => d.rows)).filter(r => !r.error);
   const live = rows.filter(r => !r.disabled && r.active && !r.halted);
   const stableAvail = live.filter(r => STABLES.has(r.symbol)).reduce((a,r) => a + r.available, 0);
-  const fullest = live.filter(r => r.pct !== null).sort((a,b) => b.pct - a.pct)[0];
   const capped = live.filter(r => r.pct !== null);
-  const totalCapUsed = capped.reduce((a,r) => a + r.pct, 0) / (capped.length || 1);
-  const fEmoji = fullest ? (fullest.pct >= 99.9 ? "99.99%" : fullest.pct.toFixed(1) + "%") : "-";
-  return `
-    <div class="stat"><div class="k">Live wrappers</div><div class="v">${live.length}</div>
-      <div class="sub">across Ethereum + Avalanche</div></div>
-    <div class="stat"><div class="k">Stablecoin headroom</div><div class="v">$${fmt(stableAvail, 0)}</div>
-      <div class="sub">room left on $-pegged wrappers</div></div>
-    <div class="stat"><div class="k">Fullest wrapper</div><div class="v ${fullest && fullest.pct>=90?'warn':''}">${fEmoji}</div>
-      <div class="sub">${fullest ? fullest.symbol + " · " + HUBS[fullest.chain].label : "-"}</div></div>
-    <div class="stat"><div class="k">Avg fill (capped)</div><div class="v">${totalCapUsed.toFixed(1)}%</div>
-      <div class="sub">${capped.length} capped wrappers</div></div>`;
+  const fullest = capped.slice().sort((a,b) => b.pct - a.pct)[0];
+  const avg = capped.length ? capped.reduce((a,r) => a + r.pct, 0) / capped.length : null;
+
+  document.getElementById("kpi-live").textContent = live.length;
+  document.getElementById("kpi-head").textContent = "$" + fmt(stableAvail, 0);
+  document.getElementById("kpi-head-sub").textContent =
+    live.filter(r => STABLES.has(r.symbol)).length + " $-pegged wrappers";
+  const fEl = document.getElementById("kpi-full");
+  fEl.textContent = fullest ? (fullest.pct >= 99.9 ? "99.99%" : fullest.pct.toFixed(1) + "%") : "—";
+  fEl.className = "val" + (fullest && fullest.pct >= 90 ? " warn" : "");
+  document.getElementById("kpi-full-sub").textContent =
+    fullest ? fullest.symbol + " · " + HUBS[fullest.chain].label : "no capped wrappers";
+  document.getElementById("kpi-avg").textContent = avg === null ? "—" : avg.toFixed(1) + "%";
+  document.getElementById("kpi-avg-sub").textContent = capped.length + " capped wrappers";
+}
+
+function paintSources(all, errs, t) {
+  /* one clock for the whole bar; a chain only gets its own line when it FAILED */
+  const good = Object.keys(HUBS).filter(c => !errs[c]);
+  const bad  = Object.keys(HUBS).filter(c => errs[c]);
+  document.getElementById("srcline").innerHTML =
+    (good.length ? `<span class="src"><span class="sdot live"></span>${good.map(c=>`${HUBS[c].label} block ${all[c].block.toLocaleString()}`).join(" · ")} — live ${t}</span>` : "")
+    + bad.map(c => `<span class="src"><span class="sdot err"></span>${HUBS[c].label} unavailable — ${errs[c]}</span>`).join("")
+    + `<span class="src"><span class="sdot live"></span>caps, supply and flags all read live from the hub</span>`;
 }
 
 let toastTimer;
@@ -386,29 +573,35 @@ function toast(msg) {
 }
 document.addEventListener("click", e => {
   const a = e.target.closest(".addr");
-  if (a) { navigator.clipboard.writeText(a.dataset.a).then(() => toast("Address copied")).catch(()=>{}); }
+  if (a) navigator.clipboard.writeText(a.dataset.a).then(() => toast("Address copied")).catch(()=>{});
 });
 
-const btn = document.getElementById("refresh");
+/* Theme: bootstrap is the blocking script in <head>; the toggle handler is delegated
+   from nav.js so all three pages share one implementation. */
+
+const btn = document.getElementById("refreshbtn");
 async function refresh() {
   btn.classList.add("loading"); btn.disabled = true;
-  document.getElementById("status").textContent = "Reading Ethereum + Avalanche…";
   try {
-    const entries = await Promise.all(Object.keys(HUBS).map(async c => [c, await readChain(c)]));
-    const all = Object.fromEntries(entries);
-    document.getElementById("summary").innerHTML = summaryHTML(all);
-    document.getElementById("chains").innerHTML = Object.keys(HUBS).map(c => chainHTML(c, all[c])).join("");
-    const now = new Date().toLocaleTimeString("en-US", { hour12:false });
-    const blocks = Object.entries(all).map(([c,d]) => `${HUBS[c].label} ${d.block.toLocaleString()}`).join(" · ");
-    document.getElementById("status").innerHTML = `<span class="dot">●</span> ${blocks} · updated ${now}`;
-  } catch (e) {
-    document.getElementById("status").textContent = "Failed: " + (e.message || e);
+    const settled = await Promise.allSettled(Object.keys(HUBS).map(c => readChain(c)));
+    const all = {}, errs = {};
+    Object.keys(HUBS).forEach((c, i) => {
+      const s = settled[i];
+      if (s.status === "fulfilled") all[c] = s.value;
+      else errs[c] = String((s.reason && s.reason.message) || s.reason);
+    });
+    const t = new Date().toLocaleTimeString("en-US", { hour12:false, hour:"2-digit", minute:"2-digit" });
+    document.getElementById("chains").innerHTML =
+      Object.keys(all).map(c => chainHTML(c, all[c])).join("") ||
+      `<section class="block"><div class="method">Both chains failed to read. Public RPCs rate-limit bursts — press <b>Refresh from chain</b> to retry.</div></section>`;
+    paintKPIs(all);
+    paintSources(all, errs, t);
   } finally {
     btn.classList.remove("loading"); btn.disabled = false;
   }
 }
-btn.addEventListener("click", refresh);
-refresh();
+btn.addEventListener("click", () => refresh().catch(console.error));
+refresh().catch(console.error);
 </script>
 </body>
 </html>

@@ -4,12 +4,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex" />
-<script defer src="https://marcusblabs.github.io/toolkit-nav.js"></script>
+<!-- Theme bootstrap: blocking and FIRST, so a light-theme user never sees a dark flash.
+     Must stay ahead of every stylesheet. The toggle handler lives in nav.js. -->
+<script>try{if(localStorage.getItem('le-theme')==='light')document.documentElement.dataset.theme='light'}catch(e){}</script>
+<script defer src="nav.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://api.fontshare.com" crossorigin>
 <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<title>Loop Economics · Balancer Toolkit</title>
+<title>Loop Economics · Aave v4 Dashboards</title>
 <style>
   :root {
     --bg:          #383e47;
@@ -20,11 +24,10 @@
     --border:      rgba(255,255,255,0.08);
     --border-strong: rgba(255,255,255,0.16);
     --panel-border: rgba(255,255,255,0.09);
-    --input-bg:    #3b3b3b;
     --input-border:#535d6a;
     --text:        rgba(255,255,255,0.92);
     --text-dim:    #c2cbd8;
-    --text-mute:   #a0aec0;
+    --text-mute:   #b3bdcc;
     --primary:     #7f6ae8;
     --primary-dim: #6b54e0;
     --primary-hov: #b3aef5;
@@ -63,11 +66,10 @@
     --border:      rgba(20,26,38,0.09);
     --border-strong: rgba(20,26,38,0.18);
     --panel-border: rgba(20,26,38,0.10);
-    --input-bg:    #ffffff;
     --input-border:#c3cad6;
     --text:        #232833;
     --text-dim:    #454e5e;
-    --text-mute:   #6d7788;
+    --text-mute:   #5b6575;
     --primary:     #6b54e0;
     --primary-dim: #5a43cf;
     --primary-hov: #5a43cf;
@@ -95,6 +97,7 @@
     min-height: 100vh;
     font-size: 14px;
     line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
   }
   body::before {
     content: '';
@@ -127,7 +130,7 @@
     box-shadow: 0 4px 20px color-mix(in srgb, var(--primary) 30%, transparent);
   }
   .brand h1 {
-    font-size: 16px; font-weight: 700; letter-spacing: -0.2px;
+    font-size: 18px; font-weight: 700; letter-spacing: -0.3px;
     background: linear-gradient(90deg, #b3aef5 0%, #d7cbe7 25%, #e5c8c8 50%, #eaa879 100%);
     -webkit-background-clip: text; background-clip: text;
     -webkit-text-fill-color: transparent; color: transparent;
@@ -203,7 +206,7 @@
   section.block { padding: 26px 0; border-bottom: 1px solid var(--border); }
   section.block:last-of-type { border-bottom: none; }
   .block-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
-  .block-head h2 { font-size: 15px; font-weight: 700; letter-spacing: -.1px; }
+  .block-head h2 { font-size: 17px; font-weight: 700; letter-spacing: -.2px; }
   .block-head .note { color: var(--text-mute); font-size: 12px; }
 
   /* ============ FINDINGS STRIP — calm stat-tiles, thin colored left border ============ */
@@ -229,7 +232,7 @@
 
   /* ============ ENGINE EXPLAINER card ============ */
   .engines { display: flex; flex-direction: column; gap: 8px; background: var(--bg-elev); border: 1px solid var(--panel-border); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--card-shadow); }
-  .engines .eng { display: flex; align-items: baseline; gap: 10px; font-size: 16px; color: var(--text-mute); line-height: 1.6; }
+  .engines .eng { display: flex; align-items: baseline; gap: 10px; font-size: 14.5px; color: var(--text-mute); line-height: 1.6; }
   .engines .eng b { color: var(--text-dim); font-weight: 600; }
   .engines .edot { width: 10px; height: 10px; border-radius: 3px; flex: none; transform: translateY(1px); }
   .eng-native .edot { background: var(--pos); } .eng-fees .edot { background: var(--accent); }
@@ -256,10 +259,16 @@
   .filters button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
   /* ============ RANKED BOARD (viewer positions-table idiom) ============ */
+  /* The <th> used to declare position:sticky, but it never worked: overflow-x:auto forces the
+     vertical axis to a scroll container too, which traps the sticky element inside the wrapper.
+     `overflow-y:clip` would dodge that, but it computes to `hidden` here — still a container.
+     Capping the wrapper height would make sticky work, but a nested scroll region fights the
+     expandable rows. So the header is deliberately NOT sticky; the reading key sits above the
+     table instead, where it is available before you start scrolling. */
   .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; background: var(--bg-elev); border: 1px solid var(--panel-border); border-radius: var(--radius); box-shadow: var(--card-shadow); }
   table.board { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 900px; }
   table.board thead th {
-    position: sticky; top: 0; z-index: 2;
+    z-index: 2;
     background: var(--bg-elev);
     padding: 13px 16px; text-align: left;
     color: var(--text-mute); font-size: 11px; font-weight: 500;
@@ -295,31 +304,29 @@
   .tdcard .tdsum-name { font-weight: 700; font-size: 14.5px; color: var(--text); font-family: var(--font-mono); }
   .tdcard .tdsum-driver { color: var(--text-mute); font-size: 12px; }
   .tdcard .tdsum-right { margin-left: auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .tdcard .tdsum-apy { font-family: var(--font-mono); font-size: 17px; font-weight: 600; }
   .tdcard .caret { color: var(--text-mute); font-size: 11px; transition: transform .15s; }
   .tdcard[open] .caret { transform: rotate(180deg); }
   .tdcard .tdbody { padding: 4px 18px 20px; border-top: 1px solid var(--border); }
-  .verdict { font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; padding: 3px 9px; border-radius: 999px; }
-  .verdict.red { background: var(--neg-soft); color: var(--neg); }
-  .verdict.green { background: var(--pos-soft); color: var(--pos); }
-  .volbadge { font-family: var(--font-mono); font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
   .conf { font-family: var(--font-mono); font-size: 11px; color: var(--text-mute); }
   .conf b { color: var(--text-dim); font-weight: 500; }
 
   /* teardown internals (ported components, viewer tokens) */
-  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 11px; margin: 16px 0 22px; }
+  .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 11px; margin: 16px 0 22px; }
   .tile { background: var(--bg); border: 1px solid var(--panel-border); border-radius: var(--radius); padding: 13px 15px; }
   .tile .k { font-family: var(--font-mono); font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: var(--text-mute); }
   .tile .v { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 21px; font-weight: 600; margin-top: 5px; letter-spacing: -.01em; }
   .tile .vsub { font-family: var(--font-mono); font-size: 11px; color: var(--text-mute); margin-top: 3px; }
-  h3.sh { font-size: 12px; font-family: var(--font-mono); letter-spacing: .05em; text-transform: uppercase; color: var(--text-dim); margin: 22px 0 12px; }
+  h3.sh { font-size: 12.5px; font-family: var(--font-mono); letter-spacing: .05em; text-transform: uppercase; color: var(--text-dim); margin: 22px 0 12px; }
   h3.sh .n { color: var(--primary-hov); margin-right: 8px; }
   .diagram { background: var(--bg); border: 1px solid var(--panel-border); border-radius: var(--radius); padding: 16px; overflow-x: auto; }
   .pool-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; background: var(--bg-elev-2); border-radius: var(--radius-sm); padding: 9px 14px; margin-bottom: 10px; }
   .pool-bar .title { font-family: var(--font-mono); font-size: 12.5px; font-weight: 600; }
   .pool-bar .title .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 2px; vertical-align: baseline; }
   .pool-bar .facts { font-family: var(--font-mono); font-size: 11px; color: var(--text-mute); display: flex; gap: 14px; flex-wrap: wrap; }
-  .sides { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; min-width: 600px; }
+  /* min-width here dates from when teardowns had the full page width. They now render inside
+     the board's expansion panel, which is viewport-width on a phone — a hard 600px floor blew
+     the panel out and every descendant inherited the overflow. Stack the two sides instead. */
+  .sides { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; min-width: 600px; }
   .side { border: 1px solid var(--panel-border); border-radius: var(--radius-sm); overflow: hidden; background: var(--bg-elev); }
   .side-head { padding: 9px 13px; display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid var(--border); }
   .side-head .lbl { font-family: var(--font-mono); font-size: 10px; letter-spacing: .07em; text-transform: uppercase; font-weight: 600; }
@@ -344,12 +351,14 @@
   .mathrow .op, .mathrow .eq { color: var(--text-mute); } .mathrow .sup { color: var(--pos); } .mathrow .bor { color: var(--neg); }
   .mathrow .res { font-size: 17px; font-weight: 700; }
   .mathnote { text-align: center; font-family: var(--font-mono); font-size: 10.5px; color: var(--text-mute); margin-top: 8px; }
-  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
   .tbl-wrap { overflow-x: auto; border: 1px solid var(--panel-border); border-radius: var(--radius); background: var(--bg-elev); }
-  .tbl-wrap table { border-collapse: collapse; width: 100%; min-width: 440px; font-size: 12.5px; }
-  .tbl-wrap th, .tbl-wrap td { text-align: right; padding: 9px 13px; border-bottom: 1px solid var(--border); }
+  .tbl-wrap table { border-collapse: collapse; width: 100%; table-layout: fixed; font-size: 12.5px; }
+  .tbl-wrap th, .tbl-wrap td { text-align: right; padding: 9px 6px; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+  .tbl-wrap th:first-child, .tbl-wrap td:first-child { width: 24%; padding-left: 12px; }
+  .tbl-wrap th:last-child, .tbl-wrap td:last-child { padding-right: 13px; }
   .tbl-wrap th:first-child, .tbl-wrap td:first-child { text-align: left; }
-  .tbl-wrap thead th { font-family: var(--font-mono); font-size: 10px; letter-spacing: .05em; text-transform: uppercase; color: var(--text-mute); font-weight: 600; background: var(--bg-elev-2); }
+  .tbl-wrap thead th { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: .02em; text-transform: uppercase; color: var(--text-mute); font-weight: 600; background: var(--bg-elev-2); }
   .tbl-wrap tbody tr:last-child td { border-bottom: none; }
   .tbl-wrap tbody td { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--text-dim); }
   .tbl-wrap tbody td:first-child { font-family: var(--font-sans); color: var(--text); }
@@ -357,13 +366,16 @@
   .tk { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
   .tk .chip { width: 8px; height: 8px; border-radius: 2px; padding: 0; }
   .call { border: 1px solid var(--panel-border); border-radius: var(--radius); padding: 16px 18px; background: var(--bg-elev); box-shadow: var(--card-shadow); }
-  .call h4 { font-size: 15px; margin: 0 0 8px; color: var(--text); }
-  .call p { margin: 0 0 10px; font-size: 16px; line-height: 1.6; color: var(--text-mute); } .call p:last-child { margin-bottom: 0; }
+  .call h4 { font-size: 14.5px; font-weight: 700; margin: 0 0 8px; color: var(--text); }
+  .call p { margin: 0 0 10px; font-size: 14.5px; line-height: 1.6; color: var(--text-mute); } .call p:last-child { margin-bottom: 0; }
   .call p b { color: var(--text-dim); }
   .call .exrew { font-family: var(--font-mono); font-size: 11.5px; background: var(--bg-elev-2); border-radius: var(--radius-sm); padding: 9px 12px; color: var(--text-dim); margin-top: 4px; line-height: 1.6; }
   .mech { overflow-x: auto; border: 1px solid var(--panel-border); border-radius: var(--radius); background: var(--bg-elev); }
-  .mech table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
-  .mech td { padding: 9px 13px; border-bottom: 1px solid var(--border); font-family: var(--font-mono); color: var(--text-dim); }
+  /* table-layout:fixed — a normal table refuses to shrink below its cells' min-content width,
+     so inside the narrow expansion panel it overflowed regardless of width:100%. */
+  .mech table { border-collapse: collapse; width: 100%; table-layout: fixed; font-size: 12.5px; }
+  .mech td { padding: 9px 13px; border-bottom: 1px solid var(--border); font-family: var(--font-mono); color: var(--text-dim); overflow-wrap: anywhere; }
+  .mech td:first-child { width: 58%; }
   .mech td:last-child { text-align: right; }
   .mech tr:last-child td { border-bottom: none; }
   .tag { display: inline-block; font-family: var(--font-mono); font-size: 9px; font-weight: 600; letter-spacing: .05em; padding: 1px 5px; border-radius: 4px; vertical-align: middle; transform: translateY(-1px); margin-left: 2px; line-height: 1.4; }
@@ -380,15 +392,15 @@
   /* ============ STUDY internals (ported) ============ */
   .verdictbox { background: var(--bg); border: 1px solid var(--panel-border); border-left: 3px solid var(--primary); border-radius: var(--radius); padding: 15px 18px; margin-bottom: 20px; }
   .verdictbox .q { font-size: 15px; font-weight: 650; margin: 0 0 8px; color: var(--text); }
-  .verdictbox p { margin: 0 0 9px; font-size: 16px; line-height: 1.6; color: var(--text-mute); } .verdictbox p:last-child { margin: 0; }
+  .verdictbox p { margin: 0 0 9px; font-size: 14.5px; line-height: 1.6; color: var(--text-mute); } .verdictbox p:last-child { margin: 0; }
   .verdictbox b { color: var(--text-dim); }
-  .costcompare { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 6px 0 20px; }
+  .costcompare { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin: 6px 0 20px; }
   .costcard { border: 1px solid var(--panel-border); border-radius: var(--radius); padding: 14px 16px; background: var(--bg); }
   .costcard .ct { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--text-mute); margin-bottom: 8px; }
   .costcard .cv { font-family: var(--font-mono); font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
   .costcard .cbits { font-family: var(--font-mono); font-size: 11px; color: var(--text-mute); margin-top: 6px; line-height: 1.6; }
   .costcard.win { border-color: var(--pos); }
-  .cfrow { display: grid; grid-template-columns: 200px 1fr 62px; gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--border); }
+  .cfrow { display: grid; grid-template-columns: 200px minmax(0, 1fr) 62px; gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--border); }
   .cfrow:last-child { border-bottom: none; }
   .cfrow .cfp { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-dim); }
   .cfbars { position: relative; height: 30px; }
@@ -403,20 +415,117 @@
   .cflegend { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-mute); margin: 4px 0 0; display: flex; gap: 16px; flex-wrap: wrap; }
   .cflegend span { display: inline-flex; align-items: center; gap: 5px; }
   .cflegend i { width: 14px; height: 8px; border-radius: 2px; display: inline-block; }
-  .lbcard-desc { color: var(--text-mute); font-size: 16px; margin: 0 0 12px; max-width: 90ch; line-height: 1.6; }
+  .lbcard-desc { color: var(--text-mute); font-size: 14.5px; margin: 0 0 12px; max-width: 90ch; line-height: 1.6; }
   .tchip { font-family: var(--font-mono); font-size: 9.5px; font-weight: 700; padding: 1px 5px; border-radius: 4px; background: var(--bg-elev-2); color: var(--text-mute); margin-left: 6px; letter-spacing: .03em; }
+
+  /* ============ EXPANDABLE BOARD ROWS ============ */
+  table.board th .thbtn {
+    all: unset; display: inline-flex; align-items: center; gap: 4px;
+    cursor: pointer; width: 100%; font: inherit; color: inherit;
+  }
+  table.board th.numeric .thbtn { justify-content: flex-end; }
+  table.board th .thbtn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 3px; }
+  table.board tr.expandable { cursor: pointer; }
+  table.board tr.expandable:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+  /* ============ BOARD READING KEY (collapsed, above the table) ============ */
+  .keycard { margin-bottom: 10px; }
+  .keycard > summary {
+    list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 7px;
+    font-size: 12px; color: var(--text-mute); padding: 5px 11px;
+    border: 1px solid var(--border); border-radius: 999px; user-select: none;
+    transition: border-color .15s, color .15s;
+  }
+  .keycard > summary::-webkit-details-marker { display: none; }
+  .keycard > summary:hover { border-color: var(--primary-bord); color: var(--primary-hov); }
+  .keycard > summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+  .keycard > summary .caret { font-size: 9px; transition: transform .15s; }
+  .keycard[open] > summary .caret { transform: rotate(180deg); }
+  .keycard .board-note { margin-top: 10px; }
+
+  /* ============ BUILD-UP LADDER ============ */
+  .ladder {
+    margin-top: 10px; background: var(--bg-elev); border: 1px solid var(--panel-border);
+    border-left: 3px solid var(--accent); border-radius: var(--radius); padding: 13px 16px;
+  }
+  .ladder-h { font-size: 12.5px; font-weight: 700; color: var(--text-dim); margin-bottom: 8px; }
+  .ladder-note { font-weight: 400; color: var(--text-mute); font-size: 11.5px; margin-left: 6px; }
+  .ladder table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 12.5px; }
+  .ladder td:first-child { width: 48%; }
+  .ladder td:nth-child(2) { width: 27%; }
+  .ladder-lbl { display: block; margin-top: 3px; color: var(--text-mute); font-size: 12px; line-height: 1.4; }
+  .ladder tr.total .ladder-lbl { margin-top: 0; color: inherit; font-size: 12.5px; }
+  .ladder td { padding: 5px 0; border-bottom: 1px solid var(--border); color: var(--text-mute); }
+  .ladder td.numeric { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; padding-left: 14px; }
+  .ladder tr.total td { border-bottom: none; font-weight: 700; color: var(--text); padding-top: 7px; }
+  .ladder tr:last-child td { border-bottom: none; }
+  .ladder-foot { font-size: 12px; color: var(--text-mute); line-height: 1.55; margin: 9px 0 0; }
+  .ladder-foot b { color: var(--accent); }
+
+  /* ============ ENGINE EXAMPLES (jump into the board) ============ */
+  .engex { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+  .engex:empty { display: none; }
+  .engex-lbl { font-size: 12px; color: var(--text-mute); margin-right: 2px; }
+  .engex-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: var(--bg-elev); border: 1px solid var(--panel-border);
+    border-radius: 999px; padding: 4px 12px 4px 6px;
+    font-family: inherit; font-size: 12px; color: var(--text-dim);
+    cursor: pointer; transition: border-color .15s, background .15s;
+  }
+  .engex-btn:hover { border-color: var(--primary-bord); background: var(--primary-soft); }
+  .engex-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+  .engex-pair { font-family: var(--font-mono); font-size: 11.5px; }
+  .engex-apy { font-family: var(--font-mono); font-size: 11.5px; font-weight: 700; }
+
+  /* what the headline APY collapses to once the subsidy is removed — shown inline on any
+     row whose green sign exists only because of a Merkl campaign */
+  .exrew-line {
+    display: block; font-family: var(--font-mono); font-size: 10px; font-weight: 500;
+    color: var(--text-mute); margin-top: 2px; white-space: nowrap;
+  }
+  /* stronger colour when the subsidy is the only thing holding the sign up */
+  .exrew-line.flips { color: var(--accent); font-weight: 600; }
+  .rowcaret {
+    display: inline-block; margin-right: 7px; font-size: 9px; color: var(--text-mute);
+    transition: transform .15s ease; transform-origin: 45% 50%;
+  }
+  table.board tr.is-open .rowcaret { transform: rotate(90deg); color: var(--primary-hov); }
+  table.board tr.is-open > td { background: var(--primary-soft); }
+  /* Board cells are white-space:nowrap so rows stay on one line. The expansion panel lives in
+     a <td> and inherits that, which stopped every string inside a teardown from wrapping —
+     the real cause of the panel overflowing on narrow viewports. Set it on the cell only:
+     descendants inherit `normal`, while components with their own explicit nowrap
+     (.chip, .ladder td.numeric, .wbar span) keep it. */
+  table.board tr.exprow > td { white-space: normal; padding: 0; background: var(--bg); border-top: none; }
+  table.board tr.exprow:hover > td { background: var(--bg); }
+  /* The board is a min-width:900px table inside a horizontally-scrolling wrapper, so a
+     colspan cell stretches to the full table width and the teardown would run off-screen.
+     Pinning the panel to the scroll container's left edge keeps it readable at the viewport
+     width while the row above it still scrolls normally. */
+  .expwrap {
+    position: sticky; left: 0;
+    box-sizing: border-box;
+    width: min(1104px, calc(100vw - 56px));
+    padding: 4px 18px 22px;
+    border-bottom: 2px solid var(--primary-bord);
+  }
+  @media (max-width: 900px) { .expwrap { width: calc(100vw - 32px); padding: 4px 12px 18px; } }
+  .dustnote { font-size: 14px; color: var(--text-mute); line-height: 1.6; margin: 14px 0 12px; max-width: 90ch; }
+  .dustnote b { color: var(--text-dim); }
+  .dustbtn { height: 32px; font-size: 12px; }
+  @media (prefers-reduced-motion: reduce) { .rowcaret { transition: none; } }
 
   /* ============ AAVE FENCE (distinct card background) ============ */
   .fence { background: var(--bg-fence); border: 1px solid var(--border-strong); border-radius: var(--radius); padding: 20px 22px; box-shadow: var(--card-shadow); }
   .fence .fence-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
   .fence .fence-head h2 { font-size: 15px; font-weight: 700; }
   .thesis { background: var(--bg-elev); border: 1px solid var(--panel-border); border-left: 3px solid var(--primary); border-radius: var(--radius); padding: 15px 18px; margin-bottom: 18px; }
-  .thesis h4 { font-size: 15px; margin: 0 0 8px; color: var(--text); }
-  .thesis p { margin: 0; font-size: 16px; line-height: 1.6; color: var(--text-mute); }
+  .thesis h4 { font-size: 15px; font-weight: 700; margin: 0 0 8px; color: var(--text); }
+  .thesis p { margin: 0; font-size: 14.5px; line-height: 1.6; color: var(--text-mute); }
   .thesis b { color: var(--text-dim); }
   .fresh { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; border: 1px solid var(--accent); background: var(--accent-soft); border-radius: var(--radius-sm); padding: 9px 14px; font-family: var(--font-mono); font-size: 11.5px; color: var(--text-dim); margin: 0 0 18px; line-height: 1.55; }
   .fresh b { color: var(--accent); }
-  .rateboard { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0 0 8px; }
+  .rateboard { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin: 0 0 8px; }
   .ratecol { border: 1px solid var(--panel-border); border-radius: var(--radius); background: var(--bg-elev); overflow: hidden; }
   .ratecol h5 { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--text-mute); margin: 0; padding: 10px 14px; background: var(--bg-elev-2); border-bottom: 1px solid var(--border); font-weight: 600; }
   .ratecol .rl { display: flex; justify-content: space-between; align-items: baseline; padding: 7px 14px; border-bottom: 1px solid var(--border); font-family: var(--font-mono); font-size: 12px; }
@@ -435,8 +544,8 @@
   .lq.thin { background: var(--accent-soft); color: var(--accent); }
   .lq.dead { background: var(--neg-soft); color: var(--neg); }
   .lq.shared { background: var(--primary-soft); color: var(--primary-hov); }
-  .lq.temp { background: var(--primary-soft); color: var(--primary-hov); }
-  .svault { border: 1px solid var(--panel-border); border-radius: var(--radius); background: var(--bg-elev); padding: 14px 16px; margin-bottom: 10px; display: grid; grid-template-columns: 34px 1fr; gap: 14px; }
+  .lq.temp { background: var(--accent-soft); color: var(--accent); }   /* time-limited — reads as a caveat, not a category */
+  .svault { border: 1px solid var(--panel-border); border-radius: var(--radius); background: var(--bg-elev); padding: 14px 16px; margin-bottom: 10px; display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 14px; }
   .svault .srank { font-family: var(--font-mono); font-size: 19px; font-weight: 700; color: var(--text-mute); text-align: center; line-height: 1.1; }
   .svault .srank .sfam { display: block; margin: 6px auto 0; }
   .svault .sh2 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 10px; margin-bottom: 3px; }
@@ -449,7 +558,7 @@
   .carrychip.wide, .carrychip.mid { background: var(--pos-soft); color: var(--pos); }
   .carrychip.thin { background: var(--accent-soft); color: var(--accent); }
   .carrychip.inc { background: var(--primary-soft); color: var(--primary-hov); }
-  .svault .snote { font-size: 16px; color: var(--text-mute); line-height: 1.6; margin: 0; }
+  .svault .snote { font-size: 14.5px; color: var(--text-mute); line-height: 1.6; margin: 0; }
   .svault .snote b { color: var(--text-dim); }
   .carrypair { display: flex; flex-wrap: wrap; gap: 5px 8px; font-family: var(--font-mono); font-size: 12px; margin: 2px 0 7px; align-items: baseline; }
   .carrypair .cp { color: var(--text-mute); font-size: 11px; }
@@ -483,15 +592,33 @@
     .kpi { padding: 14px; } .kpi .val { font-size: 18px; }
     .shell { padding: 0 16px; }
     .vstrip { grid-template-columns: 1fr 1fr; }
-    .two, .costcompare, .rateboard { grid-template-columns: 1fr; }
-    .tiles { grid-template-columns: repeat(2, 1fr); }
-    .cfrow { grid-template-columns: 120px 1fr 52px; }
+    .two, .costcompare, .rateboard { grid-template-columns: minmax(0, 1fr); }
+    /* stack the lend/borrow panels and release the 600px floor — see .sides */
+    .sides { grid-template-columns: minmax(0, 1fr); min-width: 0; }
+    .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cfrow { grid-template-columns: 110px minmax(0, 1fr) 52px; }
     .footer { padding: 12px 16px; }
   }
   @media (max-width: 520px) {
     .vstrip { grid-template-columns: 1fr; }
     .brand .sub { display: none; }
+    /* Teardowns now render INSIDE the board's expansion panel, which is only ~343px wide on a
+       phone. Two tile columns leave ~150px each and the labels/values overflow their cells. */
+    .tiles { grid-template-columns: minmax(0, 1fr); gap: 9px; margin: 12px 0 16px; }
+    .tile .v { font-size: 19px; }
+    .ladder td:first-child { padding-right: 10px; }
+    .ladder-h { font-size: 12px; }
   }
+  /* Long mono strings (rate breakdowns, campaign names) must wrap rather than push the panel
+     wider than the sticky container that pins it to the viewport.
+     Flex and grid items both default to min-width:auto, so a long child refuses to shrink and
+     overflows its parent silently — every flex/grid child inside a teardown needs min-width:0. */
+  .tile .k, .tile .vsub, .conf { overflow-wrap: anywhere; }
+  .ladder td:first-child { overflow-wrap: anywhere; }
+  .pool-bar > *, .fee-strip > *, .mathrow > *, .side-head > *, .tok-h > *, .engex-btn > * {
+    min-width: 0; overflow-wrap: anywhere;
+  }
+  .mathnote, .ladder-foot, .lbcard-desc, .snote { overflow-wrap: anywhere; }
   @media (prefers-reduced-motion: reduce) { .spin { animation-duration: 2s; } .tdcard .caret { transition: none; } }
 </style>
 </head>
@@ -501,7 +628,6 @@
   <!-- TOP BAR -->
   <div class="topbar">
     <div class="brand">
-      <div class="logo">B</div>
       <div>
         <h1>Correlated-Pair Loop Economics</h1>
         <div class="sub">Fluid loop vaults decomposed by APR engine · evaluated at Aave v4 rates</div>
@@ -509,8 +635,6 @@
     </div>
     <div class="right">
       <button class="btn ghost" id="themebtn" type="button" aria-label="Toggle light/dark theme">◐</button>
-      <span class="label">Updated</span>
-      <span class="stat-time" id="asof">snapshot 2026-07-15</span>
       <button class="btn primary" id="refreshbtn" type="button"><span class="spin" aria-hidden="true"></span><span>Refresh from source</span></button>
     </div>
   </div>
@@ -520,8 +644,8 @@
     <div class="srcline" id="srcline">
       <span class="src"><span class="sdot wait"></span>Fluid: loading…</span>
       <span class="src"><span class="sdot wait"></span>Merkl: loading…</span>
+      <span class="src"><span class="sdot wait"></span>Aave v4: loading…</span>
       <span class="src"><span class="sdot wait"></span>Chain: loading…</span>
-      <span class="src"><span class="sdot static"></span>Aave hubs: static 2026-07-15 · manual refresh only</span>
     </div>
   </div>
 
@@ -535,12 +659,12 @@
       <div class="label">Greens ex-incentive</div>
       <div class="val primary" id="kpi-greens">—</div>
     </div>
-    <div class="kpi" title="Live data sources this session: Fluid API, Merkl API, public RPC. The Aave v4 hub table is a static snapshot.">
-      <div class="label">Live sources</div>
+    <div class="kpi" title="Share of tracked collateral sitting in vaults whose headline APY depends on a Merkl campaign — either for its sign, or for most of its magnitude.">
+      <div class="label">Subsidy-dependent TVL</div>
       <div class="val dim" id="kpi-sources">—</div>
     </div>
-    <div class="kpi" title="Last successful refresh from source">
-      <div class="label">Last refresh</div>
+    <div class="kpi" title="Total collateral across every tracked DEX vault, from the live Fluid read.">
+      <div class="label">Tracked collateral</div>
       <div class="val dim" id="kpi-updated">—</div>
     </div>
   </div>
@@ -562,11 +686,12 @@
         <span class="eng eng-base" role="listitem"><span class="edot"></span><span><b>Base carry</b> — the plain lend-minus-borrow spread; usually thin on correlated pairs.</span></span>
         <span class="eng eng-inc" role="listitem"><span class="edot"></span><span><b>Incentives</b> — Merkl campaigns subsidize the APR; real cash flow, but temporary.</span></span>
       </div>
+      <div class="engex" id="engex"></div>
     </section>
 
     <!-- RANKED BOARD -->
     <section class="block" aria-label="Ranked vaults">
-      <div class="block-head"><h2>Fluid DEX vaults, ranked</h2><span class="note" id="board-note-head">live from the Fluid API · click a column to sort</span></div>
+      <div class="block-head"><h2>Fluid DEX vaults, ranked</h2><span class="note" id="board-note-head">loading from the Fluid API…</span></div>
       <div class="filters" id="famfilters">
         <span class="label">Family:</span>
         <button data-fam="all" class="on">All</button>
@@ -575,14 +700,18 @@
         <button data-fam="yusd">Yield USD</button>
         <button data-fam="stable">Stables</button>
       </div>
+      <!-- The reading key belongs BEFORE the 43-row table, not after it — collapsed by default
+           so it explains the markers on demand without pushing the data down the page. -->
+      <details class="keycard">
+        <summary>How to read this table<span class="caret">▼</span></summary>
+        <p class="board-note" id="board-note"></p>
+      </details>
       <div class="table-wrap"><table class="board" id="board"><thead></thead><tbody></tbody></table></div>
-      <p class="board-note" id="board-note"></p>
     </section>
 
-    <!-- TEARDOWNS -->
-    <section class="block" aria-label="Teardowns">
-      <div class="block-head"><h2>Teardowns — one vault per engine</h2><span class="note">the full reserve-weighted decomposition, recomputed live</span></div>
-      <div id="teardowns"></div>
+    <!-- WSTETH-DEBT STUDY -->
+    <section class="block" aria-label="wstETH-debt study">
+      <div class="block-head"><h2>Standing question — is LST debt the problem?</h2><span class="note">a counterfactual across every wstETH-borrowing vault, recomputed live</span></div>
       <details class="tdcard" id="studycard">
         <summary>
           <span class="tdsum-name">wstETH-debt question</span>
@@ -601,8 +730,8 @@
       <div class="fence">
         <div class="fence-head">
           <h2>At Aave v4 rates</h2>
-          <span class="staticbadge">Aave data static 2026-07-15 · manual refresh only</span>
-          <span class="note" style="color:var(--text-mute);font-size:12px">the same loop structures evaluated against Aave v4 hub liquidity — incentive and fee terms refresh live</span>
+          <span class="staticbadge" id="aavebadge">Aave data loading…</span>
+          <span class="note" style="color:var(--text-mute);font-size:12px">the same loop structures evaluated against Aave v4 hub liquidity — hub rates, depth, collateral factors, incentives and fee comparables all refresh live</span>
         </div>
         <div id="spoke"></div>
       </div>
@@ -618,10 +747,11 @@
 </div>
 
 <div class="footer">
-  <span>Data from <a href="https://api.fluid.instadapp.io/" target="_blank" rel="noopener">Fluid API</a> · <a href="https://api.merkl.xyz/" target="_blank" rel="noopener">Merkl API</a> · public RPC (<a href="https://ethereum-rpc.publicnode.com" target="_blank" rel="noopener">publicnode</a>)</span>
+  <span>Data from <a href="https://api.fluid.instadapp.io/" target="_blank" rel="noopener">Fluid API</a> · <a href="https://api.merkl.xyz/" target="_blank" rel="noopener">Merkl API</a> · <a href="https://api.aave.com/graphql" target="_blank" rel="noopener">Aave API</a> · public RPC (<a href="https://ethereum-rpc.publicnode.com" target="_blank" rel="noopener">publicnode</a>)</span>
   <span>
     <a href="https://github.com/marcusblabs/aave-dashboards" target="_blank" rel="noopener">View source</a>
     · <a href="./">All dashboards</a>
+    · <a href="https://marcusblabs.github.io/" target="_blank" rel="noopener">Balancer Toolkit</a>
     · <a href="vault-economics-v1.html">Previous layout</a>
   </span>
 </div>
@@ -685,7 +815,7 @@ const V = {
 const ORDER=[44,51,61,77];
 
 /* ============ LEADERBOARD + STUDY DATA (live API 2026-07-15) ============ */
-const LB = {"scale": [{"id": 44, "pair": "wstETH-ETH → wstETH-ETH", "T": "T4", "col": 35.7, "eq": 3.8, "debt": 31.9, "util": 89, "cap": 98, "pos": 199, "lev": -9.57, "src": "Base carry", "dur": "Rate-thin", "green": false, "inc": false}, {"id": 74, "pair": "weETH-ETH → wstETH", "T": "T2", "col": 20.7, "eq": 7.1, "debt": 13.6, "util": 66, "cap": 51, "pos": 270, "lev": -3.4, "src": "Base carry", "dur": "Rate-thin", "green": false, "inc": false}, {"id": 164, "pair": "reUSD-USDT → USDT", "T": "T2", "col": 14.7, "eq": 2.0, "debt": 12.7, "util": 87, "cap": 100, "pos": 40, "lev": 2.5, "src": "Native yield", "dur": "Volume-dep", "green": true, "inc": false, "vol": true}, {"id": 159, "pair": "ETH-osETH → wstETH", "T": "T2", "col": 11.7, "eq": 0.7, "debt": 11.0, "util": 94, "cap": 53, "pos": 3, "lev": 0.7, "src": "Native yield", "dur": "Structural", "green": true, "inc": false}, {"id": 51, "pair": "WBTC-cbBTC → WBTC-cbBTC", "T": "T4", "col": 10.7, "eq": 1.1, "debt": 9.6, "util": 89, "cap": 35, "pos": 377, "lev": 2.52, "src": "Swap fees", "dur": "Volume-dep", "green": true, "inc": false, "vol": true}, {"id": 163, "pair": "reUSD → USDC-USDT", "T": "T3", "col": 10.5, "eq": 1.5, "debt": 8.9, "util": 85, "cap": 0, "pos": 78, "lev": 12.7, "src": "Native yield", "dur": "Structural", "green": true, "inc": false}], "demand": [{"id": 164, "pair": "reUSD-USDT → USDT", "T": "T2", "col": 14.7, "eq": 2.0, "debt": 12.7, "util": 87, "cap": 100, "pos": 40, "lev": 2.5, "src": "Native yield", "dur": "Volume-dep", "green": true, "inc": false, "vol": true}, {"id": 44, "pair": "wstETH-ETH → wstETH-ETH", "T": "T4", "col": 35.7, "eq": 3.8, "debt": 31.9, "util": 89, "cap": 98, "pos": 199, "lev": -9.57, "src": "Base carry", "dur": "Rate-thin", "green": false, "inc": false}, {"id": 159, "pair": "ETH-osETH → wstETH", "T": "T2", "col": 11.7, "eq": 0.7, "debt": 11.0, "util": 94, "cap": 53, "pos": 3, "lev": 0.7, "src": "Native yield", "dur": "Structural", "green": true, "inc": false}, {"id": 74, "pair": "weETH-ETH → wstETH", "T": "T2", "col": 20.7, "eq": 7.1, "debt": 13.6, "util": 66, "cap": 51, "pos": 270, "lev": -3.4, "src": "Base carry", "dur": "Rate-thin", "green": false, "inc": false}, {"id": 169, "pair": "PST-USDC → USDC-USDT", "T": "T4", "col": 5.0, "eq": 1.0, "debt": 4.0, "util": 80, "cap": 41, "pos": 4, "lev": 10.4, "src": "Native yield", "dur": "Structural", "green": true, "inc": false}, {"id": 51, "pair": "WBTC-cbBTC → WBTC-cbBTC", "T": "T4", "col": 10.7, "eq": 1.1, "debt": 9.6, "util": 89, "cap": 35, "pos": 377, "lev": 2.52, "src": "Swap fees", "dur": "Volume-dep", "green": true, "inc": false, "vol": true}], "yield_": [{"id": 163, "pair": "reUSD → USDC-USDT", "T": "T3", "col": 10.5, "eq": 1.5, "debt": 8.9, "util": 85, "cap": 0, "pos": 78, "lev": 12.7, "src": "Native yield", "dur": "Structural", "green": true, "inc": false}, {"id": 78, "pair": "rsETH-ETH → wstETH", "T": "T2", "col": 4.1, "eq": 0.5, "debt": 3.6, "util": 88, "cap": 32, "pos": 63, "lev": 12.3, "src": "Swap fees", "dur": "Volume-dep", "green": true, "inc": false, "vol": true}, {"id": 169, "pair": "PST-USDC → USDC-USDT", "T": "T4", "col": 5.0, "eq": 1.0, "debt": 4.0, "util": 80, "cap": 41, "pos": 4, "lev": 10.4, "src": "Native yield", "dur": "Structural", "green": true, "inc": false}, {"id": 51, "pair": "WBTC-cbBTC → WBTC-cbBTC", "T": "T4", "col": 10.7, "eq": 1.1, "debt": 9.6, "util": 89, "cap": 35, "pos": 377, "lev": 2.52, "src": "Swap fees", "dur": "Volume-dep", "green": true, "inc": false, "vol": true}, {"id": 164, "pair": "reUSD-USDT → USDT", "T": "T2", "col": 14.7, "eq": 2.0, "debt": 12.7, "util": 87, "cap": 100, "pos": 40, "lev": 2.5, "src": "Native yield", "dur": "Volume-dep", "green": true, "inc": false, "vol": true}, {"id": 159, "pair": "ETH-osETH → wstETH", "T": "T2", "col": 11.7, "eq": 0.7, "debt": 11.0, "util": 94, "cap": 53, "pos": 3, "lev": 0.7, "src": "Native yield", "dur": "Structural", "green": true, "inc": false}], "gho": {"id": 61, "pair": "GHO-USDC → GHO-USDC", "col": 6.4, "pos": 513, "util":91, "lev": -27.54, "wrew": 17.49}, "anomaly": {"id": 77, "pair": "USDC-ETH → USDC-ETH", "col": 6.2, "pos": 430, "lev": 145.53}, "wst": [{"id": "44", "pair": "wstETH-ETH → wstETH-ETH", "lmax": 20.0, "col": 35.7, "now": -9.57, "eth": -7.67, "delta": 1.9, "green": false}, {"id": "74", "pair": "weETH-ETH → wstETH", "lmax": 16.7, "col": 20.7, "now": -3.4, "eth": -1.8, "delta": 1.6, "green": false}, {"id": "159", "pair": "ETH-osETH → wstETH", "lmax": 16.7, "col": 11.7, "now": 0.7, "eth": 2.3, "delta": 1.6, "green": true}, {"id": "78", "pair": "rsETH-ETH → wstETH", "lmax": 16.7, "col": 4.1, "now": 12.3, "eth": 13.9, "delta": 1.6, "green": true}, {"id": "80", "pair": "weETHs-ETH → wstETH", "lmax": 11.1, "col": 0.6, "now": 5.5, "eth": 6.5, "delta": 1.0, "green": true}, {"id": "104", "pair": "ezETH-ETH → wstETH", "lmax": 16.7, "col": 0.4, "now": 27.6, "eth": 29.2, "delta": 1.6, "green": true}], "rates": {"wst_bor": 0.13, "eth_bor": 2.25, "wst_stk": 2.21}};
+const LB = {"scale": [{"id": 44, "pair": "wstETH-ETH → wstETH-ETH", "T": "T4", "col": 35.7, "eq": 3.8, "debt": 31.9, "util": 89, "cap": 98, "pos": 199, "lev": -9.57, "src": "Base carry", "dur": "Rate-thin", "green": false, "inc": false}, {"id": 74, "pair": "weETH-ETH → wstETH", "T": "T2", "col": 20.7, "eq": 7.1, "debt": 13.6, "util": 66, "cap": 51, "pos": 270, "lev": -3.4, "src": "Base carry", "dur": "Rate-thin", "green": false, "inc": false}, {"id": 164, "pair": "reUSD-USDT → USDT", "T": "T2", "col": 14.7, "eq": 2.0, "debt": 12.7, "util": 87, "cap": 100, "pos": 40, "lev": 2.5, "src": "Native yield", "dur": "Volume-dep", "green": true, "inc": false, "vol": true}, {"id": 159, "pair": "ETH-osETH → wstETH", "T": "T2", "col": 11.7, "eq": 0.7, "debt": 11.0, "util": 94, "cap": 53, "pos": 3, "lev": 0.7, "src": "Native yield", "dur": "Structural", "green": true, "inc": false}, {"id": 51, "pair": "WBTC-cbBTC → WBTC-cbBTC", "T": "T4", "col": 10.7, "eq": 1.1, "debt": 9.6, "util": 89, "cap": 35, "pos": 377, "lev": 2.52, "src": "Swap fees", "dur": "Volume-dep", "green": true, "inc": false, "vol": true}, {"id": 163, "pair": "reUSD → USDC-USDT", "T": "T3", "col": 10.5, "eq": 1.5, "debt": 8.9, "util": 85, "cap": 0, "pos": 78, "lev": 12.7, "src": "Native yield", "dur": "Structural", "green": true, "inc": false}], "yield_": [{"id": 163, "pair": "reUSD → USDC-USDT", "T": "T3", "col": 10.5, "eq": 1.5, "debt": 8.9, "util": 85, "cap": 0, "pos": 78, "lev": 12.7, "src": "Native yield", "dur": "Structural", "green": true, "inc": false}, {"id": 78, "pair": "rsETH-ETH → wstETH", "T": "T2", "col": 4.1, "eq": 0.5, "debt": 3.6, "util": 88, "cap": 32, "pos": 63, "lev": 12.3, "src": "Swap fees", "dur": "Volume-dep", "green": true, "inc": false, "vol": true}, {"id": 169, "pair": "PST-USDC → USDC-USDT", "T": "T4", "col": 5.0, "eq": 1.0, "debt": 4.0, "util": 80, "cap": 41, "pos": 4, "lev": 10.4, "src": "Native yield", "dur": "Structural", "green": true, "inc": false}, {"id": 51, "pair": "WBTC-cbBTC → WBTC-cbBTC", "T": "T4", "col": 10.7, "eq": 1.1, "debt": 9.6, "util": 89, "cap": 35, "pos": 377, "lev": 2.52, "src": "Swap fees", "dur": "Volume-dep", "green": true, "inc": false, "vol": true}, {"id": 164, "pair": "reUSD-USDT → USDT", "T": "T2", "col": 14.7, "eq": 2.0, "debt": 12.7, "util": 87, "cap": 100, "pos": 40, "lev": 2.5, "src": "Native yield", "dur": "Volume-dep", "green": true, "inc": false, "vol": true}, {"id": 159, "pair": "ETH-osETH → wstETH", "T": "T2", "col": 11.7, "eq": 0.7, "debt": 11.0, "util": 94, "cap": 53, "pos": 3, "lev": 0.7, "src": "Native yield", "dur": "Structural", "green": true, "inc": false}], "gho": {"id": 61, "pair": "GHO-USDC → GHO-USDC", "col": 6.4, "pos": 513, "util":91, "lev": -27.54, "wrew": 17.49}, "anomaly": {"id": 77, "pair": "USDC-ETH → USDC-ETH", "col": 6.2, "pos": 430, "lev": 145.53}, "wst": [{"id": "44", "pair": "wstETH-ETH → wstETH-ETH", "lmax": 20.0, "col": 35.7, "now": -9.57, "eth": -7.67, "delta": 1.9, "green": false}, {"id": "74", "pair": "weETH-ETH → wstETH", "lmax": 16.7, "col": 20.7, "now": -3.4, "eth": -1.8, "delta": 1.6, "green": false}, {"id": "159", "pair": "ETH-osETH → wstETH", "lmax": 16.7, "col": 11.7, "now": 0.7, "eth": 2.3, "delta": 1.6, "green": true}, {"id": "78", "pair": "rsETH-ETH → wstETH", "lmax": 16.7, "col": 4.1, "now": 12.3, "eth": 13.9, "delta": 1.6, "green": true}, {"id": "80", "pair": "weETHs-ETH → wstETH", "lmax": 11.1, "col": 0.6, "now": 5.5, "eth": 6.5, "delta": 1.0, "green": true}, {"id": "104", "pair": "ezETH-ETH → wstETH", "lmax": 16.7, "col": 0.4, "now": 27.6, "eth": 29.2, "delta": 1.6, "green": true}], "rates": {"wst_bor": 0.13, "eth_bor": 2.25, "wst_stk": 2.21}};
 
 const f=(x,s)=>((x<0?"−":s?"+":"")+Math.abs(x).toFixed(2)+"%");
 const cvar=t=>t==="t0"?"var(--t0)":"var(--t1)";
@@ -715,27 +845,40 @@ function tableRows(side, isCol, live){
   const rows=side.tokens.map(k=>`<tr><td><span class="tk"><span class="chip" style="background:${cvar(k.t)}"></span>${k.n}</span></td>
     <td>${k.w}%</td><td>${k.base}%</td><td>${k.staking?k.staking+'%':'0%'}</td>${anyReward(side)?`<td>${k.reward?(isCol?'+':'−')+k.reward+'%':'0%'}</td>`:''}<td class="${isCol?'pos':'neg'}">${k.rate}%</td><td>${k.contrib.toFixed(2)}%</td></tr>`).join("");
   const trSign = isCol? '+' : '−';
-  const feeRow = `<tr class="total"><td>${trSign} swap fee to LP</td><td></td><td></td><td></td>${anyReward(side)?'<td></td>':''}<td></td><td class="pos">${trSign}${side.trading}%</td></tr>`;
-  const netRow = `<tr class="total"><td>= Net ${isCol?'Supply':'Borrow'} APR</td><td></td><td></td><td></td>${anyReward(side)?'<td></td>':''}<td></td><td>${side.net.toFixed(2)}% <span class="tag ${live?'d':'r'}">${live?'D':'R'}</span></td></tr>`;
+  const feeRow = `<tr class="total"><td>${trSign} swap fee</td><td></td><td></td><td></td>${anyReward(side)?'<td></td>':''}<td></td><td class="pos">${trSign}${side.trading}%</td></tr>`;
+  /* the reliability badge lives in the WIDE label cell — in the 57px numeric column it was
+     an unbreakable inline-block that pushed the whole table into a horizontal scroll */
+  const netRow = `<tr class="total"><td>= Net ${isCol?'supply':'borrow'} <span class="tag ${live?'d':'r'}">${live?'D':'R'}</span></td><td></td><td></td><td></td>${anyReward(side)?'<td></td>':''}<td></td><td>${side.net.toFixed(2)}%</td></tr>`;
   return rows+feeRow+netRow;
 }
 function loopMath(v){
-  const L=v.lmax, Lm=L-1, s=v.col.net, b=v.debt.net;
+  /* Multiply by the EXACT leverage; only the caption is rounded. Using the 1dp display value
+     here made the printed equation disagree with the printed result by up to 0.20pp. */
+  const Lx=v.L||v.lmax, L=+Lx.toFixed(2), Lm=+(Lx-1).toFixed(2), s=v.col.net, b=v.debt.net;
   const bpart = b<0 ? `<span class="op">−</span> (<span class="bor">Borrow ${b}%</span>)<span class="op">×</span><span>${Lm}</span>` :
                       `<span class="op">−</span> <span class="bor">Borrow ${b}%</span><span class="op">×</span><span>${Lm}</span>`;
   const rescol = v.maxLev>=0? 'var(--pos)':'var(--neg)';
   return `<div class="mathrow"><span class="sup">Supply ${s}%</span><span class="op">×</span><span>${L}</span> ${bpart}
     <span class="eq">=</span><span class="res" style="color:${rescol}">${f(v.maxLev,true)}</span></div>
-    <div class="mathnote">Max Leverage APY = Supply·L − Borrow·(L−1), L = 1/(1−CF) = ${L}× <span class="tag d">D</span> ${v.live?'· recomputed live from the API — method validated 3/3 vs Fluid pages (2026-07-15)':(v.confirmed?(v.vol?'· reconciled to Fluid\'s page at read time — swap-fee volatile <span class="tag r">R</span>':'· matches Fluid vault page <span class="tag r">R</span>'):'· NOT in Multiply UI — computed via the validated method <span class="tag na">NA</span>')}</div>`;
+    <div class="mathnote">Max Leverage APY = Supply·L − Borrow·(L−1), L = 1/(1−CF) = ${L}× <span class="tag d">D</span> ${v.live?`· recomputed live from the API — method validated 3/3 vs Fluid pages (${SNAPDATE})`:(v.confirmed?(v.vol?'· reconciled to Fluid\'s page at read time — swap-fee volatile <span class="tag r">R</span>':'· matches Fluid vault page <span class="tag r">R</span>'):'· NOT in Multiply UI — computed via the validated method <span class="tag na">NA</span>')}</div>
+    ${v.spread!=null?`<div class="mathnote" style="margin-top:6px">Rearranged, that is <span class="mono">L·(Supply − Borrow) + Borrow</span> — the spread times leverage, plus one unlevered unit. The <b>live spread</b> (rewards included) is <b class="${v.spread<0?'neg':'pos'}">${sgn(v.spread,2)}%</b>, so leverage <b>${v.spread<0?'reduces':'adds to'}</b> the return: ${f(v.col.net,true)} unlevered → ${f(v.maxLev,true)} at ${L}×.${v.spread<0?' A negative spread means every extra turn of leverage costs you — the result stays positive only because you still hold one unlevered unit of collateral.':''}</div>`:''}`;
 }
 /* ---------- wstETH-debt study ---------- */
 function buildStudy(){
   const R=LB.rates, W=LB.wst;
   const wstCost=(R.wst_bor+R.wst_stk).toFixed(2), ethCost=R.eth_bor.toFixed(2);
   const per1x=((R.wst_bor+R.wst_stk)-R.eth_bor);
-  const dLo=Math.min(...W.map(w=>w.delta)).toFixed(1), dHi=Math.max(...W.map(w=>w.delta)).toFixed(1);
+  /* Direction is DERIVED, never assumed. per1x > 0 means ETH debt is cheaper and the swap
+     helps; per1x < 0 means wstETH debt is now the cheaper leg and the swap hurts. The two
+     costs sit within a few basis points of each other, so this sign genuinely flips —
+     which is exactly why the old hard-coded "+" printed literal "+-0.2%" on live data. */
+  const better=per1x>0, near=Math.abs(per1x)<0.05;
+  const dLo=Math.min(...W.map(w=>w.delta)), dHi=Math.max(...W.map(w=>w.delta));
+  const rng=`${sgn(dLo,1)}% to ${sgn(dHi,1)}%`;
+  LB.study={better,near,per1x,rng};
+  const verb=near?"move":better?"improve":"worsen";
   const cEl=document.getElementById("lstcallout");
-  if(cEl) cEl.innerHTML=`Swapping wstETH debt for plain ETH would improve these loops by only <b>~+${dLo} to +${dHi}% at their max leverage</b> — mostly arbitraged away: the ${R.wst_stk.toFixed(2)}% staking drag is priced into wstETH's near-zero borrow rate (${R.wst_bor.toFixed(2)}%), so the true ETH-terms costs nearly cancel (${wstCost}% vs ${ethCost}%). The real lever is the collateral-vs-debt yield gap, not the LST-ness of the debt.`;
+  if(cEl) cEl.innerHTML=`Swapping wstETH debt for plain ETH would ${verb} these loops by only <b>~${rng} at their max leverage</b>${near?" — the two costs have converged to within a basis point":""} — mostly arbitraged away: the ${R.wst_stk.toFixed(2)}% staking drag is priced into wstETH's near-zero borrow rate (${R.wst_bor.toFixed(2)}%), so the true ETH-terms costs nearly cancel (${wstCost}% vs ${ethCost}%). The real lever is the collateral-vs-debt yield gap, not the LST-ness of the debt.`;
   // counterfactual bars: scale spans the live data (min -12..+30), zero line position
   const vals=W.flatMap(w=>[w.now,w.eth]);
   const LO=Math.min(-12,Math.floor(Math.min(...vals))-2), HI=Math.max(30,Math.ceil(Math.max(...vals))+2), span=HI-LO, zero=(0-LO)/span*100;
@@ -766,26 +909,26 @@ function buildStudy(){
   document.getElementById("study").innerHTML = `
   <div class="verdictbox" style="margin-top:10px">
     <p class="q">Would the vaults that borrow wstETH do better borrowing a non-LST token?</p>
-    <p><b>Directionally yes — but only about +${dLo} to +${dHi}% APY, and for a subtler reason than "you stop paying the staking yield."</b> When you borrow wstETH your debt appreciates against ETH at the ~${R.wst_stk.toFixed(2)}% staking rate, which is a real cost. But the market has already repriced it: wstETH's own borrow interest sits near zero (${R.wst_bor.toFixed(2)}%) precisely because it is cheap-to-borrow, while plain ETH's borrow interest has risen to ${R.eth_bor.toFixed(2)}%. So the two costs almost cancel.</p>
-    <p>The true, apples-to-apples cost in ETH terms is nearly identical — the staking drag is mostly arbitraged away. The improvement from switching to ETH debt is small per unit, and only looks meaningful because leverage multiplies it ~16×.</p>
-    <p style="font-size:12px;color:var(--faint);margin:0">Base interest and staking rates drift only a basis point or two intraday; the swap-fee-driven vaults elsewhere in this dashboard move far more.</p>
+    <p><b>${near?`Right now, essentially no difference — about ${rng} APY either way`:better?`Directionally yes — but only about ${rng} APY`:`No — on today's rates the swap would <i>cost</i> you ${rng} APY`}, and for a subtler reason than "you stop paying the staking yield."</b> When you borrow wstETH your debt appreciates against ETH at the ~${R.wst_stk.toFixed(2)}% staking rate, which is a real cost. But the market has already repriced it: wstETH's own borrow interest sits near zero (${R.wst_bor.toFixed(2)}%) precisely because it is cheap-to-borrow, while plain ETH's borrow interest has risen to ${R.eth_bor.toFixed(2)}%. So the two costs almost cancel${better?"":" — and currently overshoot, leaving wstETH the cheaper leg"}.</p>
+    <p>The true, apples-to-apples cost in ETH terms is nearly identical — the staking drag is mostly arbitraged away. The difference from switching to ETH debt is small per unit, and only looks meaningful because leverage multiplies it ~16×. <b>The sign of this comparison is not stable</b>: it turns on a spread of a few basis points between two borrow rates, so it flips as those rates drift.</p>
+    <p style="font-size:12px;color:var(--text-mute);margin:0">Base interest and staking rates drift only a basis point or two intraday; the swap-fee-driven vaults elsewhere in this dashboard move far more.</p>
   </div>
 
   <section>
     <h3 class="sh"><span class="n">01</span>The cost identity (in ETH terms)</h3>
     <div class="costcompare">
-      <div class="costcard">
+      <div class="costcard${better||near?'':' win'}">
         <div class="ct">Borrow wstETH — true cost</div>
-        <div class="cv neg">${wstCost}%</div>
+        <div class="cv ${better?'neg':''}">${wstCost}%</div>
         <div class="cbits">${R.wst_bor}% borrow interest<br>+ ${R.wst_stk}% staking (debt grows vs ETH)</div>
       </div>
-      <div class="costcard win">
+      <div class="costcard${better&&!near?' win':''}">
         <div class="ct">Borrow ETH — cost</div>
-        <div class="cv">${ethCost}%</div>
+        <div class="cv ${better?'':'neg'}">${ethCost}%</div>
         <div class="cbits">${R.eth_bor}% borrow interest<br>+ 0% staking</div>
       </div>
     </div>
-    <p class="lbcard-desc" style="text-align:center;max-width:none">Per 1× ETH debt is only <b>${per1x.toFixed(2)}% cheaper</b> <span class="tag d">D</span>. Multiplied through leverage that becomes the ~+${dLo} to +${dHi}% swing below.</p>
+    <p class="lbcard-desc" style="text-align:center;max-width:none">Per 1×, ETH debt is <b>${Math.abs(per1x).toFixed(2)}% ${better?"cheaper":"more expensive"}</b> <span class="tag d">D</span>${near?" — i.e. the two have converged":""}. Multiplied through leverage that becomes the ~${rng} swing below.</p>
   </section>
 
   <section>
@@ -799,7 +942,8 @@ function buildStudy(){
         <span>right column = improvement <span class="tag d">D</span></span>
       </div>
     </div>
-    <p class="lbcard-desc" style="margin-top:12px">Every wstETH-borrowing vault would gain, consistently ~+${dLo} to +${dHi}%. ${W[0]&&W[0].eth<0?`But note <b>wstETH-ETH stays red (${f(W[0].eth,true)}) even with ETH debt</b>: its problem is not the LST debt, it is being net-short via weight mirroring plus 20× on a near-zero spread.`:`(In the live read, even wstETH-ETH turns green with ETH debt — check whether the spread regime changed.)`}</p>
+    <p class="lbcard-desc" style="margin-top:12px">Every wstETH-borrowing vault moves the same way, consistently ~${rng}. ${W[0]&&W[0].eth<0?`But note <b>wstETH-ETH stays red (${f(W[0].eth,true)}) even with ETH debt</b>: its problem is not the LST debt, it is being net-short via weight mirroring plus 20× on a near-zero spread.`:`(In the live read, even wstETH-ETH turns green with ETH debt — check whether the spread regime changed.)`}
+      ${W.some(w=>w.pool)?`<br><span style="font-size:12px;color:var(--text-mute)">Rows whose debt is a two-token pool are scaled by the wstETH share of that leg (${W.filter(w=>w.pool).map(w=>w.id+": "+w.share+"%").join(", ")}) — for those the swap is not a clean alternative anyway, since replacing the wstETH leg with ETH would collapse the pool into ETH-ETH.</span>`:""}</p>
   </section>
 
   <section>
@@ -807,7 +951,7 @@ function buildStudy(){
     <div class="call">
       <h4>Borrowing a zero-yield token only helps if your collateral out-yields it</h4>
       <p>Compare two vaults. <b>wstETH-ETH</b>: collateral yields ~2% and debt costs ~2% — almost no gap to capture, so leverage just amplifies noise (and the mirror makes it negative). <b>reUSD → USDC-USDT</b>: collateral yields ~6% (reUSD) and debt costs ~0% (stable, no staking) — a wide gap, which is exactly why it is among the best durable loops at <b class="pos">${(()=>{const r=LB.yield_.find(x=>x.id===163);return r?f(r.lev,true):"+12.7% (07-15)"})()}</b>.</p>
-      <p>The LST-LP → wstETH vaults are thin because their collateral (weETH/rsETH/ezETH restaking ~2.5%) barely out-yields wstETH debt (~${wstCost}%). Switching to ETH debt widens that gap a little (~+${dLo} to +${dHi}% at max leverage), but the structural fix is to pair a high-yield collateral with a genuinely low-yield correlated debt.</p>
+      <p>The LST-LP → wstETH vaults are thin because their collateral (weETH/rsETH/ezETH restaking ~2.5%) barely out-yields wstETH debt (~${wstCost}%). Switching to ETH debt ${better?"widens":"narrows"} that gap only marginally (~${rng} at max leverage), but the structural fix is to pair a high-yield collateral with a genuinely low-yield correlated debt.</p>
     </div>
   </section>
 
@@ -879,7 +1023,7 @@ const LOOPS=[
   {r:5,fam:"eth",struct:"P → S",col:"wstETH-WETH",debt:"WETH",hub:"Core",hcls:"hub-core",cap:"shares the $3.09M",capTag:"r",
    dcheck:"single debt: WETH, shares the same $3.09M with #4",carry:"thin",carryL:"~Breakeven · fees",
    inc:{t:"none",txt:"WETH-borrow rebate is EtherFi-spoke-specific — WETH borrowed outside that spoke likely does NOT get it"},
-   note:"Collateral POOL = wstETH + WETH + swap fees; borrow WETH. Staking barely covers the borrow, so it leans on fees, and (unlike #4) it probably misses the EtherFi WETH rebate. Draws the same $3.09M WETH pool as #4 — the two structures share that capacity."},
+   note:"Collateral POOL = wstETH + WETH + swap fees; borrow WETH. Staking barely covers the borrow, so it leans on fees, and (unlike #4) it probably misses the EtherFi WETH rebate. Draws the same WETH pool as #4 — the two structures share that capacity (depth shown live above)."},
   {r:6,fam:"stable",struct:"P → P",col:"USDG-frxUSD",debt:"USDG-frxUSD",hub:"Core",hcls:"hub-core",cap:"~$38M",capTag:"d",
    dcheck:"debt pool: USDG $23M + frxUSD $15M — both borrowable, deep",carry:"thin",carryL:"Thin base · but see incentive",
    inc:{t:"supply",key:"usdgfrx"},
@@ -909,14 +1053,30 @@ const EXCLUDED=[
   {col:"* → *-RLUSD pool",gate:"Dead liquidity",why:"Any pool with RLUSD as debt fails — RLUSD is <b>$0.80 borrowable</b> everywhere."},
   {col:"LBTC-XAUt, PAXG-XAUt, sfrxUSD-*",gate:"Not correlated / not listed",why:"BTC-vs-gold isn't correlated; PAXG and sfrxUSD aren't on v4 at all."},
 ];
+/* one badge used everywhere the Aave layer is surfaced, so the page can never claim
+   "static" on live data or "live" on the fallback */
+function aaveTag(){
+  const s=SRC.aave;
+  if(s.state==="live") return `<span class="lq deep" style="margin:0">live ${s.at} · api.aave.com</span>`;
+  if(s.state==="stale") return `<span class="staticbadge">Aave STALE — kept ${s.at}</span>`;
+  return `<span class="staticbadge">Aave snapshot ${SNAPDATE} — live fetch pending</span>`;
+}
 function buildSpoke(){
+  const badge=document.getElementById("aavebadge");
+  if(badge) badge.outerHTML=`<span class="staticbadge" id="aavebadge">${
+    SRC.aave.state==="live"?`Aave hubs live ${SRC.aave.at}`
+    :SRC.aave.state==="stale"?`Aave hubs STALE — kept ${SRC.aave.at}`
+    :`Aave hubs snapshot ${SNAPDATE}`}</span>`;
   const hubCards=HUBS.map(h=>{
     const rows=h.borrow.map(b=>`<div class="rl"><span class="tkn"><span class="famdot fam-${b.fam}"></span>${b.t}<span class="lq ${b.lq}">${b.lq}</span></span><span class="rr">${b.cap} <span style="color:var(--faint)">@${b.apy}</span></span></div>`).join("");
     return `<div class="ratecol"><h5><span class="hubbadge ${h.cls}">${h.name}</span> &nbsp;borrowable liquidity</h5>${rows}<div class="hubcoll">${h.coll}</div></div>`;
   }).join("");
+  /* effective-borrow arithmetic reads the SAME live WETH leg the projection table uses,
+     rather than repeating the old 2.27% scrape as a third hard-coded copy */
+  const wethBor=(borrowLeg("Core",["WETH"])||{apy:PROJLEGS[3].bor}).apy;
   const INCTXT={
     susde:a=>`Merkl +${a.susde.toFixed(2)}% on sUSDe/USDe supply (looping)`,
-    weth:a=>`Merkl +${a.weth.toFixed(2)}% rebate on WETH borrow (EtherFi spoke) → effective borrow ~${(2.27-a.weth).toFixed(2)}%`,
+    weth:a=>`Merkl +${a.weth.toFixed(2)}% rebate on WETH borrow (EtherFi spoke) → effective borrow ~${(wethBor-a.weth).toFixed(2)}%`,
     usdgfrx:a=>`Merkl +${a.usdg.toFixed(2)}% USDG & +${a.frx.toFixed(2)}% frxUSD on SUPPLY → collateral earns ~+${((a.usdg+a.frx)/2).toFixed(1)}% × leverage. Flips thin → WIDE`
   };
   const INCKEYS={susde:["susde"],weth:["weth"],usdgfrx:["usdg","frx"]};
@@ -926,6 +1086,22 @@ function buildSpoke(){
     if(INCKEYS[v.inc.key].some(k=>LASTINC[k]==null))
       return `<div class="incline"><span class="lq thin" style="margin:0">incentive ended/unrenewed</span> <span style="font-family:var(--mono);font-size:10.5px;color:var(--faint)">campaign no longer live on Merkl — re-check §04 before relying on it</span></div>`;
     return `<div class="incline"><span class="carrychip inc" style="background:var(--t0-soft);color:var(--t0)">Merkl ${v.inc.t} <span class="tag r" style="margin-left:3px">R</span></span> <span class="lq temp" style="margin:0">temp</span> <span style="font-family:var(--mono);font-size:10.5px;color:var(--dim)">${INCTXT[v.inc.key](LASTINC)}</span></div>`;
+  };
+  /* borrowable depth + the both-legs check, derived from the live hub read rather than
+     from the hand-written "~$50M" / "debt pool: WBTC $38M + cbBTC $12M" strings */
+  const depthOf=v=>{
+    const legs=PROJLEGS[v.r-1];
+    const L=legs&&borrowLeg(legs.hub,legs.debt);
+    if(!L) return {cap:v.cap,tag:v.capTag,dcheck:v.dcheck};
+    const parts=legs.debt.map(t=>`${t} ${usdShort(ABORROW[legs.hub+"|"+t].usd)}`).join(" + ");
+    const worst=lqBand(L.min);
+    return {
+      cap:usdShort(L.usd), tag:"r",
+      dcheck:legs.debt.length>1
+        ? `debt pool: ${parts} — ${worst==="dead"?"one leg is DEAD, the structure cannot form"
+            :worst==="thin"?"thinnest leg is shallow":"both borrowable"}; binding leg ${usdShort(L.min)}`
+        : `single debt: ${parts}${worst==="dead"?" — DEAD, the structure cannot form":worst==="thin"?" — shallow":""}`
+    };
   };
   // carry pair: 10x base + w/ fees + w/ incentive, joined from PROJ so cards and the §03 table agree.
   // If base is negative but a fee estimate exists (the #3 case), lead with the fee figure.
@@ -944,7 +1120,9 @@ function buildSpoke(){
     if(p.inc!=="—") bits.push(seg("· w/ incentive",p.inc,"pos",' <span class="lq temp" style="margin:0">temp</span>'));
     return `<div class="carrypair">${bits.join(" ")}</div>`;
   };
-  const cards=LOOPS.map(v=>`
+  const cards=LOOPS.map(v=>{
+    const d=depthOf(v);
+    return `
     <div class="svault">
       <div class="srank">${v.r}<span class="sfam famdot fam-${v.fam}"></span></div>
       <div>
@@ -952,16 +1130,23 @@ function buildSpoke(){
           <span class="spair">${v.col}<span class="arrow">→</span>${v.debt}</span>
           <span class="sstruct">${v.struct}</span>
           <span class="hubbadge ${v.hcls}">${v.hub} hub</span>
-          <span class="sproj">borrowable ${v.cap} <span class="tag ${v.capTag}">${v.capTag.toUpperCase()}</span></span>
+          <span class="sproj">borrowable ${d.cap} <span class="tag ${d.tag}">${d.tag.toUpperCase()}</span></span>
         </div>
-        <div class="scarry"><span class="carrychip ${v.carry}">${v.carryL}</span> <span style="font-family:var(--mono);font-size:10.5px;color:var(--faint)">${v.dcheck}</span></div>
+        <div class="scarry"><span class="carrychip ${v.carry}">${v.carryL}</span> <span style="font-family:var(--mono);font-size:10.5px;color:var(--faint)">${d.dcheck}</span></div>
         ${carryPair(v)}
         ${incLine(v)}
         <p class="snote">${v.note.replace("{V51}",f(V[51].maxLev,true))}</p>
       </div>
-    </div>`).join("");
+    </div>`;}).join("");
+  /* Three states, not two: a campaign that ended days ago used to be styled identically to
+     one ending tomorrow, with no wording to tell them apart. */
+  const today=new Date().toISOString().slice(0,10);
   const soon=new Date(Date.now()+3*864e5).toISOString().slice(0,10);
-  const incRows=INCENT.map(i=>`<tr><td>${i.camp}</td><td><span class="lq ${i.side==='supply'?'deep':'shared'}" style="margin:0">${i.side}</span></td><td style="font-weight:700;color:${i.side==='supply'?'var(--pos)':'var(--accent)'}">${i.apr}</td><td class="mono">${i.tok}</td><td class="mono" style="color:${(/^\d{4}/.test(i.end)&&i.end<=soon)?'var(--neg)':'var(--dim)'}">${i.end}</td><td style="color:var(--dim)">${i.appl}</td></tr>`).join("");
+  const incRows=INCENT.map(i=>{
+    const dated=/^\d{4}/.test(i.end);
+    const expired=dated&&i.end<today, ending=dated&&!expired&&i.end<=soon;
+    return `<tr${expired?' style="opacity:.6"':''}><td>${i.camp}</td><td><span class="lq ${i.side==='supply'?'deep':'shared'}" style="margin:0">${i.side}</span></td><td style="font-weight:700;color:${expired?'var(--faint)':i.side==='supply'?'var(--pos)':'var(--accent)'}">${i.apr}</td><td class="mono">${i.tok}</td><td class="mono" style="color:${expired||ending?'var(--neg)':'var(--dim)'}">${i.end}${expired?' <span class="lq dead" style="margin:0">ended</span>':ending?' <span class="lq thin" style="margin:0">ending</span>':''}</td><td style="color:var(--dim)">${i.appl}</td></tr>`;
+  }).join("");
   const projRows=PROJ.map(p=>{
     const bcls=p.base.startsWith('−')?'neg':'pos';
     const feeCell=p.fees==='—'?'<span style="color:var(--faint)">—</span>':`<span class="pos" style="font-weight:700">${p.fees}</span>`;
@@ -976,15 +1161,15 @@ function buildSpoke(){
   document.getElementById("spoke").innerHTML=`
   <div class="thesis">
     <h4>The findings</h4>
-    <p><b>Positive without incentives:</b> the BTC pools (#1, #3) on depth and <b>sUSDe</b> (#2) on carry — green on 5-9% funding with or without Merkl. <b>Incentive-dependent:</b> USDG-frxUSD (#6) is thin alone; ~5-6% supply rewards flip it wide under leverage — the incentive, not the asset, is the yield <button class="ghochip" data-goto="gho-pattern">GHO pattern ↗</button>. <b>ETH pairs:</b> #4 and #5 draw on one shared $3.09M WETH pool; only #4 currently has a rebate with runway. Structural constraint: each loop keeps at least one 2-token correlated pool (the swap-fee leg), and a pool debt borrows <b>both</b> tokens, so both must be borrowable in-hub — which is why BTC and Plus-stables can run pool→pool while ETH pairs are pool-collateral → single-WETH.</p>
+    <p><b>Positive without incentives:</b> the BTC pools (#1, #3) on depth and <b>sUSDe</b> (#2) on carry — green on 5-9% funding with or without Merkl. <b>Incentive-dependent:</b> USDG-frxUSD (#6) is thin alone; ~5-6% supply rewards flip it wide under leverage — the incentive, not the asset, is the yield <button class="ghochip" data-goto="gho-pattern">GHO pattern ↗</button>. <b>ETH pairs:</b> #4 and #5 draw on one shared ${(borrowLeg("Core",["WETH"])||{}).usd!=null?usdShort(borrowLeg("Core",["WETH"]).usd):"$3.09M"} WETH pool; only #4 currently has a rebate with runway. Structural constraint: each loop keeps at least one 2-token correlated pool (the swap-fee leg), and a pool debt borrows <b>both</b> tokens, so both must be borrowable in-hub — which is why BTC and Plus-stables can run pool→pool while ETH pairs are pool-collateral → single-WETH.</p>
   </div>
 
   <div class="fresh"><b>⚠ Freshness:</b> live Merkl tranches end <b>${(()=>{const e=INCENT.map(i=>i.end).filter(x=>/^\d{4}/.test(x)).sort();return e.length?(e[0]===e[e.length-1]?e[0]:e[0]+" → "+e[e.length-1]):"—"})()}</b> — Merkl runs short (~weekly) tranches, renewal is the sponsor's call. §04 refreshes from Merkl with the button; <b>re-check it before quoting any with-incentive number.</b></div>
 
   <section>
-    <h3 class="sh"><span class="n">01</span>Aave v4 hubs — borrowable liquidity, not just rates <span class="staticbadge">static 2026-07-15 · manual refresh only</span></h3>
+    <h3 class="sh"><span class="n">01</span>Aave v4 hubs — borrowable liquidity, not just rates ${aaveTag()}</h3>
     <div class="rateboard">${hubCards}</div>
-    <p class="lbcard-desc" style="max-width:none"><b>Both-legs test for a pool debt:</b> viable only if <b>both</b> tokens are borrowable with depth — holds for WBTC+cbBTC, USDG+frxUSD (Core) and USDC+USDT (Plus); fails for every ETH pair (only WETH borrowable) and anything touching RLUSD (dead — 0.79% advertised, <b>$0.80</b> borrowable) or frozen rsETH.</p>
+    <p class="lbcard-desc" style="max-width:none"><b>Both-legs test for a pool debt:</b> viable only if <b>both</b> tokens are borrowable with depth — holds for WBTC+cbBTC, USDG+frxUSD (Core) and USDC+USDT (Plus); fails for every ETH pair (only WETH is borrowable — wstETH and weETH are collateral-only) and anything touching RLUSD${ABORROW["Core|RLUSD"]?` (dead — ${ABORROW["Core|RLUSD"].apy.toFixed(2)}% advertised, <b>${usdShort(ABORROW["Core|RLUSD"].usd)}</b> actually borrowable)`:""} or frozen rsETH. Depth bands: <span class="lq deep">deep</span> ≥$10M · <span class="lq ok">ok</span> ≥$1M · <span class="lq thin">thin</span> ≥$10K · <span class="lq dead">dead</span> below.</p>
   </section>
 
   <section>
@@ -995,12 +1180,12 @@ function buildSpoke(){
 
   <section>
     <h3 class="sh"><span class="n">03</span>What 10× looping pays at these rates</h3>
-    <div class="fresh" style="margin-bottom:12px"><b>⚠ Assumption:</b> all 10× figures assume a ~90% collateral factor, comparable to Fluid's correlated-pair vaults — Aave v4 parameters for such structures are unpublished (<b>UNCONFIRMED</b>), so the 10× columns are illustrative.</div>
+    <div class="fresh" style="margin-bottom:12px"><b>⚠ Assumption:</b> every structure is compared at the same <b>${PROJ_L}×</b> so the rows read like-for-like — that is a yardstick, not a claim about what Aave would grant a correlated-pair structure. ${AAVE.bestCF?`Aave <i>does</i> publish per-reserve collateral factors, and they are <b>spoke-scoped</b>, not hub-wide: the highest on a non-Pendle asset is <b>${AAVE.bestCF.cf.toFixed(1)}%</b> on ${AAVE.bestCF.sym} in the ${AAVE.bestCF.spoke} spoke (${AAVE.bestCF.hub} hub) — ${(1/(1-AAVE.bestCF.cf/100)).toFixed(1)}× if it applied, well above this table's ${PROJ_L}×. Note this is exactly the LST-correlated case these loops care about. But no published parameter covers a two-token correlated <i>pool</i> as collateral, so the mapping from these single-asset CFs onto a pool structure stays <b>UNCONFIRMED</b>, and the ${PROJ_L}× columns remain illustrative.`:`Aave v4 parameters for such structures are unpublished (<b>UNCONFIRMED</b>), so the ${PROJ_L}× columns are illustrative.`}</div>
     <div class="tbl-wrap"><table class="audit"><thead><tr><th>Vault</th><th>Supply 1×</th><th>Borrow 1×</th><th>10× base</th><th>~w/ fees <span class="tag d">D</span></th><th>w/ incentive</th><th>$/yr @$10M · base</th><th>note</th></tr></thead><tbody>${projRows}</tbody></table></div>
     <div class="call" style="margin-top:14px">
       <h4>How to read it</h4>
-      <p>Max APY = <span class="mono">Supply × 10 − Borrow × 9</span> — the loop identity, validated against Fluid's own pages. <b>sUSDe (#2) is the real engine</b> on funding alone, before any incentive; <b>USDG-frxUSD (#6) is purely incentive-driven</b> — negative base, green only while Merkl campaigns pay <button class="ghochip" data-goto="gho-pattern">GHO pattern ↗</button>. The fee column <span class="tag d">D</span> uses live Fluid comparables at 10× (BTC pair ${FEECOMP.btc.toFixed(2)}%/side → +${(FEECOMP.btc*19).toFixed(1)}%, ETH pair ${FEECOMP.eth.toFixed(2)}% → +${(FEECOMP.eth*10).toFixed(1)}%); stable pools have no comp (—). Supply legs are external native-yield estimates and the borrow legs are the static Aave snapshot; the incentive and fee terms refresh live.</p>
-      <p style="color:var(--faint);font-size:12px"><b>Estimate <span class="tag d">D</span>.</b> Native yields are external, approximate and <b>variable</b> (sUSDe shown at ~6% has ranged ~4-25%; weETH ~2.9%, wstETH ~2.2%, LBTC ~1.5% + unpriced points). $/yr = base 10× carry on $10M, indicative only. All figures are <b>gross of impermanent loss, entry slippage and liquidation</b> — 10× amplifies losses exactly as hard as gains.</p>
+      <p>Max APY = <span class="mono">Supply × ${PROJ_L} − Borrow × ${PROJ_L-1}</span> — the loop identity, validated against Fluid's own pages. Read the <b>10× base</b> column for what each structure pays unsubsidised, and the <b>w/ incentive</b> column for what the current campaigns add on top <button class="ghochip" data-goto="gho-pattern">GHO pattern ↗</button>. The fee column <span class="tag d">D</span> uses live Fluid comparables, applied per side (collateral ×${PROJ_L}, debt rebate ×${PROJ_L-1}): BTC pair ${FEECOMP.btc.col.toFixed(2)}/${FEECOMP.btc.debt.toFixed(2)}%/side → ${sgn(FEECOMP.btc.col*PROJ_L+FEECOMP.btc.debt*(PROJ_L-1),1)}%, ETH pair ${FEECOMP.eth.col.toFixed(2)}/${FEECOMP.eth.debt.toFixed(2)}% → ${sgn(FEECOMP.eth.col*PROJ_L+FEECOMP.eth.debt*(PROJ_L-1),1)}%. Stable pools have no Fluid comparable, and a comparable that rounds to zero is shown as — rather than implying a fee that is not there. <b>Borrow legs are read live from the Aave API</b>; supply legs remain external native-yield estimates.</p>
+      <p style="color:var(--faint);font-size:12px"><b>Estimate <span class="tag d">D</span>.</b> Native yields are external, approximate and <b>variable</b> (sUSDe shown at ~6% has ranged ~4-25%; weETH ~2.9%, wstETH ~2.2%, LBTC ~1.5% + unpriced points). $/yr = base 10× carry on $10M, indicative only. See Method &amp; caveats for what these figures are gross of.</p>
     </div>
   </section>
 
@@ -1009,7 +1194,7 @@ function buildSpoke(){
     <div class="tbl-wrap"><table class="audit"><thead><tr><th>Campaign</th><th>Side</th><th>APR</th><th>Reward</th><th>Ends</th><th>Applies to</th></tr></thead><tbody>${incRows}</tbody></table></div>
     <div class="call" id="gho-pattern" style="margin-top:14px;border-left:3px solid var(--t0)">
       <h4>The GHO pattern <span class="lq temp" style="margin:0">canonical</span></h4>
-      <p>Supply incentives are earned on the <b>full leveraged collateral</b> while the matching debt pays no equivalent charge — so under a loop they flip a thin stable vault to wide carry. Real cash flow, but incentive-dependent: Fluid's GHO-USDC is <b class="${LB.gho.lev<0?'neg':'pos'}">${f(LB.gho.lev,true)}</b> ex-reward and <b class="${LB.gho.wrew<0?'neg':'pos'}">${f(LB.gho.wrew,true)}</b> with it; USDG-frxUSD (#6) is the same shape on Aave. Merkl runs short (~weekly) tranches and renewal is the sponsor's call — anything green only via this pattern holds exactly as long as the current tranche.</p>
+      <p>Supply incentives are earned on the <b>full leveraged collateral</b> while the matching debt pays no equivalent charge — so under a loop they flip a thin stable vault to wide carry. Real cash flow, but incentive-dependent: Fluid's GHO-USDC is <b class="${LB.gho.lev<0?'neg':'pos'}">${f(LB.gho.lev,true)}</b> ex-reward and <b class="${LB.gho.wrew<0?'neg':'pos'}">${f(LB.gho.wrew,true)}</b> with it; USDG-frxUSD (#6) is the same shape on Aave. Dates and runway are in the freshness banner above.</p>
       <p style="color:var(--faint);font-size:12px">Eligibility caveat: whether a wrapped or vaulted supply position is captured depends on each campaign's targeting (the "Hold Wrapped Aave USDG" campaign suggests wrapped positions can qualify; this varies per campaign).</p>
     </div>
   </section>
@@ -1021,19 +1206,148 @@ function buildSpoke(){
 }
 
 /* ============ LIVE DATA LAYER ============ */
-/* Raw sources: Fluid API + Merkl API + public RPC (all CORS-open, incl. file:// "null" origin).
-   Aave v4 hub table: tokenlogic/pro.aave block browser fetches -> STATIC snapshot, manual refresh only.
+/* Raw sources, all CORS-open (incl. the file:// "null" origin):
+     Fluid API   — per-token rates, stakingApr, rewards, pool reserves
+     Merkl API   — live incentive campaigns
+     Aave API    — v4 hub/spoke reserves: borrow rates, borrowable liquidity, collateral factors
+     public RPC  — Ethereum block height
    The button re-fetches RAW inputs and RECOMPUTES every derived value in-page (loop identity,
    four-engine decomposition, base vs with-incentive, $/yr) — conclusions are never repainted stale. */
 const ENDPOINTS={
   vaults:"https://api.fluid.instadapp.io/v2/1/vaults",
-  merkl:"https://api.merkl.xyz/v4/opportunities?chainId=1&mainProtocolId=aave&items=100",
+  /* status=LIVE is server-side: the endpoint caps `items` at 50 and most rows are PAST,
+     so without this filter live campaigns can fall off the end of the window. */
+  merkl:"https://api.merkl.xyz/v4/opportunities?chainId=1&mainProtocolId=aave&status=LIVE&items=100",
+  aave:"https://api.aave.com/graphql",
   rpcs:["https://ethereum-rpc.publicnode.com","https://eth.drpc.org"]
 };
-const SRC={fluid:{state:"snapshot",at:"2026-07-15"},merkl:{state:"snapshot",at:"2026-07-15"},chain:{state:"wait",at:null,block:null}};
+const SNAPDATE="2026-07-15";   /* the date every remaining hard-coded fallback was read */
+const SRC={
+  fluid:{state:"snapshot",at:SNAPDATE},
+  merkl:{state:"snapshot",at:SNAPDATE},
+  aave:{state:"snapshot",at:SNAPDATE},
+  chain:{state:"wait",at:null,block:null}
+};
+
+/* ---------- Aave v4, live from the official public GraphQL API ----------
+   api.aave.com/graphql is the backend app.aave.com itself consumes: no key, no auth,
+   access-control-allow-origin:*, and it serves genuine v4 hub/spoke types. This replaces
+   the hand-scraped tokenlogic/pro.aave snapshot the page used to carry.
+   Unit convention: every rate and factor is a decimal FRACTION as a high-precision STRING
+   ("0.0387" = 3.87%), so parseFloat then ×100. Token amounts are already decimal-adjusted at
+   .amount.value; fiat needs the exchange(currency:) field, which forces a $currency variable. */
+const Q_HUBS=`{ hubs(request:{query:{chainIds:[1]}}) { id name chain { chainId } } }`;
+const Q_HUBASSETS=`query($c: Currency!, $h: ID!){
+  hubAssets(request:{query:{hubId:$h}}) {
+    underlying { info { symbol } }
+    summary {
+      borrowApy { value } supplyApy { value } utilizationRate { value }
+      availableLiquidity { exchange(currency:$c){ value } }
+    } } }`;
+/* no $currency here: this query reads no fiat-valued field, and the API rejects an
+   unused variable declaration outright ("Variable $c is not used") */
+const Q_RESERVES=`{
+  reserves(request:{query:{chainIds:[1]}}) {
+    spoke { name }
+    asset { underlying { info { symbol } } hub { name } }
+    settings { collateralFactor { value } borrowable collateral }
+    status { frozen }
+  } }`;
+
+const AAVE={hubs:null,assets:null,reserves:null};
+const pct=v=>v==null?null:parseFloat(v.value!=null?v.value:v)*100;
+
+async function gql(query,variables){
+  const r=await fetch(ENDPOINTS.aave,{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({query,variables:variables||{}})});
+  const j=await r.json();
+  if(j.errors&&j.errors.length) throw new Error(j.errors[0].message);
+  if(!j.data) throw new Error("no data");
+  return j.data;
+}
+async function fetchAave(){
+  const {hubs}=await gql(Q_HUBS);
+  const eth=hubs.filter(h=>h.chain.chainId===1);
+  if(!eth.length) throw new Error("no Ethereum hubs returned");
+  const [assets,res]=await Promise.all([
+    Promise.all(eth.map(h=>gql(Q_HUBASSETS,{c:"USD",h:h.id}).then(d=>d.hubAssets))),
+    gql(Q_RESERVES).then(d=>d.reserves),
+  ]);
+  return {hubs:eth,assets,reserves:res};
+}
+
+const usdShort=v=>v>=1e9?"$"+(v/1e9).toFixed(1)+"B":v>=1e6?"$"+(v/1e6).toFixed(v>=1e7?0:1)+"M"
+  :v>=1e3?"$"+Math.round(v/1e3)+"K":"$"+(v>=1?v.toFixed(0):v.toFixed(2));
+/* depth bands for the both-legs test — a pool debt needs BOTH tokens genuinely borrowable */
+const lqBand=v=>v>=1e7?"deep":v>=1e6?"ok":v>=1e4?"thin":"dead";
+const HUBCLS={Core:"hub-core",Plus:"hub-plus","Global Dollar":"hub-gd",Prime:"hub-prime"};
+
+/* per-hub, per-symbol live borrow rate + depth, keyed "Hub|SYMBOL" — the join every
+   downstream projection needs. Rebuilt wholesale on each successful Aave fetch. */
+const ABORROW={};
+function applyAave(A){
+  const borrowable={},frozen={},collCF={};
+  /* Collateral factor is SPOKE-scoped, not hub-scoped: wstETH is 80% on Main but 95.5% on the
+     Lido spoke. Track the best one and remember WHICH spoke it came from — quoting a bare
+     maximum with no spoke attached is what made the old "~90%, UNCONFIRMED" note unfalsifiable. */
+  let best=null;
+  for(const r of A.reserves){
+    const sym=r.asset.underlying.info.symbol, k=r.asset.hub.name+"|"+sym;
+    if(r.status.frozen){ frozen[k]=true; continue; }
+    if(r.settings.borrowable) borrowable[k]=true;
+    if(r.settings.collateral){
+      const cf=r.settings.collateralFactor?parseFloat(r.settings.collateralFactor.value)*100:0;
+      if(cf>0){
+        /* keep the spoke that owns the winning factor — a bare hub-wide max is the same
+           unfalsifiable claim the bestCF comment warns about (weETH is 95.5% on Etherfi
+           but 80.0% on Main; quoting "weETH 95.5%" hub-wide misleads) */
+        if(!collCF[k]||cf>collCF[k].cf) collCF[k]={cf,spoke:(r.spoke&&r.spoke.name)||"—"};
+        /* Skip Pendle PTs when picking the headline CF: several carry the highest factors on
+           the book but are dated principal tokens, and the page's own excluded-set flags the
+           7MAY2026 ones as matured. Quoting a matured PT as "the highest live CF" misleads. */
+        if(!/^PT-/i.test(sym)&&(!best||cf>best.cf))
+          best={cf,sym,spoke:(r.spoke&&r.spoke.name)||"—",hub:r.asset.hub.name};
+      }
+    }
+  }
+  AAVE.bestCF=best;
+  for(const k in ABORROW) delete ABORROW[k];
+  HUBS.length=0;
+  A.hubs.forEach((h,i)=>{
+    const rows=(A.assets[i]||[]).map(a=>({
+      t:a.underlying.info.symbol,
+      usd:parseFloat(a.summary.availableLiquidity.exchange.value)||0,
+      apy:pct(a.summary.borrowApy)||0,
+    })).filter(a=>borrowable[h.name+"|"+a.t]).sort((a,b)=>b.usd-a.usd);
+    rows.forEach(a=>{ ABORROW[h.name+"|"+a.t]={usd:a.usd,apy:a.apy}; });
+    /* collateral line: symbol + published CF, plus anything frozen, straight from the API */
+    const coll=Object.keys(collCF).filter(k=>k.indexOf(h.name+"|")===0)
+      .map(k=>({s:k.split("|")[1],cf:collCF[k].cf,spoke:collCF[k].spoke})).sort((a,b)=>b.cf-a.cf);
+    /* Frozen is per (spoke, asset). Only call an asset frozen if it is frozen EVERYWHERE in
+       the hub — WETH has a frozen Kelp spoke but is live and borrowable on Main, and listing
+       it as "WETH FROZEN" next to "WETH 83.0%" collateral reads as a contradiction. */
+    const froz=[...new Set(Object.keys(frozen).filter(k=>k.indexOf(h.name+"|")===0).map(k=>k.split("|")[1]))]
+      .filter(s=>!collCF[h.name+"|"+s]&&!borrowable[h.name+"|"+s]);
+    HUBS.push({
+      name:h.name, cls:HUBCLS[h.name]||"hub-core",
+      borrow:rows.map(a=>({t:a.t,cap:usdShort(a.usd),apy:a.apy.toFixed(2)+"%",fam:famOf(a.t),lq:lqBand(a.usd)})),
+      coll:(coll.length?"collateral (best spoke): "+coll.map(c=>`${c.s} ${c.cf.toFixed(1)}% ${c.spoke}`).join(" · "):"no collateral reserves")
+           +(froz.length?" · "+froz.join(", ")+" FROZEN":""),
+    });
+  });
+}
+/* mean live borrow APY across a structure's debt tokens; null if any leg is missing */
+function borrowLeg(hub,toks){
+  const v=toks.map(t=>ABORROW[hub+"|"+t]).filter(Boolean);
+  if(v.length!==toks.length) return null;
+  return {apy:v.reduce((a,x)=>a+x.apy,0)/v.length, usd:v.reduce((a,x)=>a+x.usd,0),
+          min:Math.min(...v.map(x=>x.usd))};
+}
 /* baseline verdict signs, captured from the 2026-07-15 snapshot before any mutation */
 const SNAPSIGN={tear:Object.fromEntries(ORDER.map(id=>[id,V[id].maxLev>=0])),ghoEx:LB.gho.lev>=0,projBase:PROJ.map(p=>!p.base.startsWith("−"))};
-const FEECOMP={btc:0.38,eth:0.03};            // Fluid comparable pool fees (%/side); refreshed from live v51/v44
+/* Fluid comparable pool fees, kept per side (collateral earns, debt rebates) because the
+   two are not equal in general — v77 currently reads 16.69 / 14.85. Refreshed from live v51/v44. */
+const FEECOMP={btc:{col:0.38,debt:0.38},eth:{col:0.03,debt:0.03}};
 const LASTINC={usdg:6.20,frx:5.36,susde:3.75,weth:0.77}; // last known Merkl APRs (snapshot defaults)
 let FLIPS=[];
 let merklRetry=false;
@@ -1058,11 +1372,12 @@ function decompose(v){
       const tot=(vals[0]+vals[1])||1; ws=vals.map(x=>100*x/tot);
     } else ws=toks.length===1?[100]:[50,50];
     const rew=which==="col"?rewSup:rewBor;
-    let net=0;
+    let net=0, lendW=0, stakeW=0;
     const tokens=toks.map((t,i)=>{
       const base=num(rates.liquidity["token"+i])/100, stk=num(t.stakingApr)/100;
       const rate=base+stk+(which==="col"?rew:-rew);
       const contrib=rate*ws[i]/100; net+=contrib;
+      lendW+=base*ws[i]/100; stakeW+=stk*ws[i]/100;
       return {t:"t"+i,n:t.symbol,w:+ws[i].toFixed(1),base:+base.toFixed(2),staking:+stk.toFixed(2),reward:rew?+rew.toFixed(2):0,rate:+rate.toFixed(2),contrib};
     });
     net=which==="col"?net+trading:net-trading;
@@ -1070,37 +1385,79 @@ function decompose(v){
     const amt=num(v[which==="col"?"totalSupply":"totalBorrow"]);
     if(dexd&&toks.length===2){let ps=0;toks.forEach((t,i)=>ps+=num(dexd["token"+i+"PerShare"])/Math.pow(10,t.decimals)*num(t.price));usd=amt/1e18*ps;}
     else if(toks.length===1){const t=toks[0];usd=amt/Math.pow(10,t.decimals)*num(t.price);}
-    const fill=dexd?(num(dexd.maxShares)?Math.min(100,100*num(dexd.totalShares)/num(dexd.maxShares)):0):null;
-    return {net:+net.toFixed(2),trading:+trading.toFixed(2),tokens,usd,fill};
+    /* The API never omits supplyDexData/borrowDexData — a side with no DEX gets a fully-formed
+       ZERO STUB (address 0x000…0, maxShares "0"). That stub is truthy, so a plain `dexd ?`
+       test reported a real 0% cap fill on every non-DEX side: 32 of the 43 DEX vaults showed
+       a false "0%", reading as "closed to deposits" on sides that have no cap concept at all. */
+    const isDex=!!(dexd&&dexd.address&&!/^0x0+$/i.test(dexd.address));
+    const fill=!isDex?null:(num(dexd.maxShares)?Math.min(100,100*num(dexd.totalShares)/num(dexd.maxShares)):0);
+    const fee=isDex?num(dexd.fee)/10000:null;      // basis-point scale: 200 → 0.02%
+    /* `net` is rounded for DISPLAY only. `netRaw` keeps full precision — the loop identity
+       multiplies these by up to 20×, so rounding each side to 2dp before the multiply shifted
+       the headline by as much as 0.10pp on 7 of the 43 DEX vaults. Always compute from netRaw. */
+    return {net:+net.toFixed(2),netRaw:net,lend:lendW,stake:stakeW,
+            trading:+trading.toFixed(2),tradingRaw:trading,tokens,usd,fill,isDex,fee,
+            dexAddr:isDex?dexd.address:null};
   }
   const c=side("col"),d=side("debt");
   return {
     L, lmax:Math.round(L*10)/10,
     cf:v.collateralFactor/100, lt:v.liquidationThreshold/100, lml:v.liquidationMaxLimit/100, pen:v.liquidationPenalty/100,
     pos:+v.totalPositions, col:c, debt:d,
-    maxLev:+(c.net*L-d.net*(L-1)).toFixed(2),
-    exLev:+((c.net-rewSup)*L-(d.net+rewBor)*(L-1)).toFixed(2),
+    maxLev:+(c.netRaw*L-d.netRaw*(L-1)).toFixed(2),
+    exLev:+((c.netRaw-rewSup)*L-(d.netRaw+rewBor)*(L-1)).toFixed(2),
+    /* the 1× legs with the subsidy stripped out — trading fees are real income, so they stay.
+       Their SIGN is the whole story: L·S − (L−1)·B = L·(S−B) + B, so when S < B the loop
+       returns LESS than simply holding the collateral, and more leverage makes it worse. */
+    colNetEx:+(c.netRaw-rewSup).toFixed(2),
+    debtNetEx:+(d.netRaw+rewBor).toFixed(2),
+    /* the bare weighted lending/borrow legs — no swap fees, no rewards. Everything else on
+       the card is one of these plus a term, which is what makes the build-up ladder additive. */
+    colBase:c.netRaw-rewSup-c.trading,
+    debtBase:d.netRaw+rewBor+d.trading,
+    /* the four engines, isolated per side — the loop identity is linear in S and B, so these
+       four terms sum exactly to maxLev and can be shown as an additive build-up on any vault */
+    colLend:c.lend, colStake:c.stake, colTrade:c.tradingRaw, colRew:rewSup,
+    debtLend:d.lend, debtStake:d.stake, debtTrade:d.tradingRaw, debtRew:rewBor,
+    spreadEx:+((c.netRaw-rewSup)-(d.netRaw+rewBor)).toFixed(3),
+    spread:+(c.netRaw-d.netRaw).toFixed(3),
     rewSup, rewBor,
-    rewEnd:(v.rewards&&v.rewards[0]&&v.rewards[0].endTime)?new Date(+v.rewards[0].endTime).toISOString().slice(0,10):null,
+    /* earliest end across ALL rewards, not rewards[0] — a supply and a borrow campaign on
+       the same vault can end on different days, and the earlier one is what binds */
+    rewEnd:(()=>{const e=(v.rewards||[]).map(r=>+r.endTime).filter(x=>x>0);
+      return e.length?new Date(Math.min(...e)).toISOString().slice(0,10):null;})(),
     colPair:sideTokens(v.supplyToken).map(t=>t.symbol).join("-"),
     debtPair:sideTokens(v.borrowToken).map(t=>t.symbol).join("-"),
     type:+v.type
   };
 }
-/* engine classification: Incentive if rewards flip the sign; Native if collateral staking dominates;
-   Swap fees if fee contribution >= max(1pp, 25% of |maxLev|); else Base carry. vol (⇅) mirrors the fee test. */
+/* Engine classification, by which term actually DOMINATES the decomposition — deliberately
+   independent of the sign of the result. (It used to short-circuit on maxLev<0, which forced
+   all 31 currently-red vaults to "Base carry" and made the flagship v44 card render
+   "driver: Native staking asymmetry · live engine: Base carry".) The sign is already carried
+   everywhere by colour and by the value itself, so the label is free to describe the driver.
+     Incentive   — rewards flip the sign, OR are large relative to the result
+     Native yield— collateral staking contribution beats fees
+     Swap fees ⇅ — fee contribution >= max(1pp, 25% of |maxLev|)
+     Base carry  — none of the above dominates; it is the plain lend-minus-borrow spread */
 function classify(o){
   const feePP=o.col.trading*o.L+o.debt.trading*(o.L-1);
   const natColPP=o.col.tokens.reduce((a,k)=>a+k.staking*k.w/100,0)*o.L;
+  const incPP=Math.abs(o.maxLev-o.exLev);           // what the rewards are worth at leverage
+  const hasRew=o.rewSup>0||o.rewBor>0;
   const vol=feePP>=Math.max(1,.25*Math.abs(o.maxLev));
-  const incGreen=(o.rewSup>0||o.rewBor>0)&&o.exLev<0&&o.maxLev>=0;
+  const incFlip=hasRew&&o.exLev<0&&o.maxLev>=0;     // strong case: rewards turn red into green
+  const incHeavy=hasRew&&incPP>=Math.max(2,.5*Math.abs(o.maxLev));  // weak case: rewards dominate but do not flip
   let src,dur;
-  if(incGreen){src="Incentive";dur="—";}
-  else if(o.maxLev<0){src="Base carry";dur="Rate-thin";}          // red: the spread is the story, not the engine
-  else if(natColPP>Math.max(feePP,1)){src="Native yield";dur="Structural";}
+  if(incFlip){src="Incentive";dur="—";}
+  else if(incHeavy){src="Incentive";dur="Reward-heavy";}
+  else if(natColPP>Math.max(feePP,1)){src="Native yield";dur=o.maxLev>=0?"Structural":"Structural · negative";}
   else if(vol){src="Swap fees";dur="Volume-dep";}
   else{src="Base carry";dur="Rate-thin";}
-  return {src,dur,vol,inc:incGreen};
+  /* `inc` keeps its narrow sign-flip meaning — the greens KPI and LB.yield_ filter on it.
+     `heavy` is the broader "rewards are a big part of this number" signal used for display:
+     a vault can be green without the subsidy and still owe most of its headline to it. */
+  return {src,dur,vol,inc:incFlip,heavy:incFlip||incHeavy};
 }
 
 /* teardown prose regenerated from the fresh numbers (structure fixed, numbers live) */
@@ -1111,62 +1468,172 @@ const PROSE={
   51:v=>{const baseNeg=(v.col.tokens.reduce((a,k)=>a+k.base*k.w/100,0))<(v.debt.tokens.reduce((a,k)=>a+k.base*k.w/100,0));return{
     lede:`BTC has no staking — base lending carry is ${baseNeg?"slightly <b>negative</b>":"thin"}, and ~${v.col.trading.toFixed(2)}% of trading fees on each side is what ${v.maxLev>=0?"keeps it green":"fails to keep it green right now"}.`,
     why:`Because the whole result rides on swap volume it is <b>volatile</b> — it moved ~0.7pp within one day around the 2026-07-15 snapshot. Read the sign, not the decimal.`};},
-  61:v=>({
-    lede:`No staking and no trading — the base carry is <b>negative</b> (GHO supply ${(v.col.net-(v.rewSup||0)).toFixed(2)}% vs USDC borrow ${(v.debt.net+(v.rewBor||0)).toFixed(2)}%); a Merkl GHO reward (+${(v.rewSup||0).toFixed(2)}% supply, +${(v.rewBor||0).toFixed(2)}% borrow rebate) is the only thing making it green.`,
-    why:`Remove the reward and it is deeply red. Note the extreme mirror: collateral is 100% GHO, debt is 100% USDC. This is the canonical incentive-dependent vault — see the GHO-pattern box on the Aave v4 analysis tab.`}),
+  /* Every clause here is derived, not asserted: this vault picked up a trading leg after the
+     snapshot, and the old hard-coded "No staking and no trading" then contradicted the fee
+     strip rendered directly above it. Labelled legs are the weighted LENDING/BORROW bases —
+     net would include the trading fee and understate the spread. */
+  61:v=>{
+    const bs=v.col.tokens.reduce((a,k)=>a+k.base*k.w/100,0), bb=v.debt.tokens.reduce((a,k)=>a+k.base*k.w/100,0);
+    const tr=v.col.trading||v.debt.trading;
+    return{
+    lede:`${tr?`Only a thin trading leg (${v.col.trading.toFixed(2)}%/side) and no staking`:"No staking and no trading"} — the base carry is <b>${bs<bb?"negative":"positive"}</b> (GHO lending ${bs.toFixed(2)}% vs USDC borrow ${bb.toFixed(2)}%); a Merkl GHO reward (+${(v.rewSup||0).toFixed(2)}% supply, +${(v.rewBor||0).toFixed(2)}% borrow rebate) is ${v.exLev<0&&v.maxLev>=0?"the only thing making it green":"layered on top"}.`,
+    why:`${v.exLev<0?"Remove the reward and it is deeply red.":"It now clears even without the reward."} Note the extreme mirror: collateral is ${v.col.tokens[0].w}% GHO, debt is ${v.debt.tokens[1].w}% USDC. This is the canonical incentive-dependent vault — see the GHO-pattern box in the Aave v4 section.`};},
   77:v=>({
     lede:`A volatile, high-volume pair — swap fees dwarf everything (+${v.col.trading.toFixed(2)}% to the collateral LP, −${v.debt.trading.toFixed(2)}% to the debt LP), so ${v.debt.net<0?`<b>net borrow is negative</b> (${v.debt.net.toFixed(2)}%: you are paid to borrow)`:`net borrow is nearly free (${v.debt.net.toFixed(2)}%)`} and max leverage compounds it to ${f(v.maxLev,true)}.`,
     why:`Big caveats: this vault is <b>not offered in the Multiply UI</b> (no app confirmation), and trading APY is point-in-time and swings hard with volume. Do not treat the headline as a stable expectation.`}),
 };
 
+/* Full decomposition per vault id, populated on every successful Fluid fetch. Keyed by id;
+   `{o, c, pair, vaultAddr}`. Empty until the first live fetch — the snapshot board's rows are
+   not expandable, because there is no decomposition behind them to show. */
+const DEC={};
+
+/* Narrative for a vault with no hand-written entry. Everything here is DERIVED from the
+   decomposition, so it stays true as the numbers move — the curated PROSE entries are a
+   decoration on top of this, not a precondition for rendering a teardown. */
+function genericProse(o,c){
+  const colStk=o.col.tokens.reduce((a,k)=>a+k.staking*k.w/100,0);
+  const debtStk=o.debt.tokens.reduce((a,k)=>a+k.staking*k.w/100,0);
+  const colBase=o.col.tokens.reduce((a,k)=>a+k.base*k.w/100,0);
+  const debtBase=o.debt.tokens.reduce((a,k)=>a+k.base*k.w/100,0);
+  const feePP=o.col.trading*o.L+o.debt.trading*(o.L-1);
+  const incPP=o.maxLev-o.exLev;
+  const big=o.col.tokens.slice().sort((a,b)=>b.w-a.w)[0];
+  const lead={
+    "Incentive":`Rewards are the dominant term: they are worth ${sgn(incPP,2)}pp at ${o.lmax}×, taking this vault from <b class="${o.exLev<0?'neg':'pos'}">${f(o.exLev,true)}</b> ex-reward to <b class="${o.maxLev<0?'neg':'pos'}">${f(o.maxLev,true)}</b>.`,
+    "Native yield":`The collateral basket pays for itself — weighted staking of ${colStk.toFixed(2)}% against ${debtStk.toFixed(2)}% on the debt side, worth ${(colStk*o.L).toFixed(1)}pp at ${o.lmax}×, ahead of the ${feePP.toFixed(1)}pp coming from swap fees.`,
+    "Swap fees":`Trading fees are the engine: ${o.col.trading.toFixed(2)}% to the collateral LP and ${o.debt.trading.toFixed(2)}% offsetting the debt, together ${feePP.toFixed(1)}pp at ${o.lmax}× — more than either staking (${colStk.toFixed(2)}%) or the lending spread.`,
+    "Base carry":`No dominant engine — this is the plain lend-minus-borrow spread: ${colBase.toFixed(2)}% lending against ${debtBase.toFixed(2)}% borrowing, ${colBase>debtBase?"a positive":"a negative"} gap of ${Math.abs(colBase-debtBase).toFixed(2)}pp before leverage.`,
+  }[c.src];
+  /* maxLev >= 0 does NOT mean supply beats borrow: when the spread is negative the result is
+     positive only via the +B term in L·(S−B)+B. Branch on the spread, not on the sign. */
+  const why=(o.maxLev>=0&&o.col.net>=o.debt.net)
+    ? `At ${o.lmax}× the ${(o.col.net).toFixed(2)}% net supply outruns ${(o.debt.net).toFixed(2)}% net borrow, leaving ${f(o.maxLev,true)}. ${c.vol?"Because the result leans on swap volume it is <b>volatile</b> — read the sign, not the decimal.":"The 1× spread is "+(o.col.net-o.debt.net).toFixed(2)+"pp, and leverage multiplies it."}`
+    : o.maxLev>=0
+    ? `At ${o.lmax}× the ${(o.col.net).toFixed(2)}% net supply sits <b>below</b> the ${(o.debt.net).toFixed(2)}% net borrow, so the ${f(o.maxLev,true)} comes entirely from the one unlevered unit of collateral you still hold — looping actually cuts the ${f(o.col.net,true)} you would earn just holding it. ${c.vol?"It is swap-fee driven, so the spread can move with volume.":""}`
+    : `At ${o.lmax}× the ${(o.debt.net).toFixed(2)}% net borrow outruns ${(o.col.net).toFixed(2)}% net supply, and leverage amplifies the gap to ${f(o.maxLev,true)}. ${c.vol?"It is swap-fee driven, so the sign can move with volume.":"A thin or inverted spread multiplied by "+o.lmax+"× — leverage does not create carry that is not there."}`;
+  return {
+    driver:{"Incentive":"Incentive-carried","Native yield":"Native yield on the collateral",
+            "Swap fees":"Swap-fee driven","Base carry":"Lend-minus-borrow spread"}[c.src],
+    lede:`${lead} Collateral is weighted ${o.col.tokens.map(k=>k.n+" "+k.w+"%").join(" / ")}${big&&big.w>=95?" — effectively single-token":""}; debt is ${o.debt.tokens.map(k=>k.n+" "+k.w+"%").join(" / ")}.`,
+    why
+  };
+}
+
+/* Assemble the object tdHTML() renders, for ANY vault id present in DEC.
+   Curated entries (44/51/61/77) keep their hand-written driver and prose; everything else
+   gets the derived narrative. Both paths use identical live numbers. */
+function viewOf(id){
+  const d=DEC[id]; if(!d) return null;
+  const o=d.o,c=d.c,cur=V[id];
+  const g=genericProse(o,c);
+  const feeTxt=s=>s.fee==null?"—":(+s.fee.toFixed(4))+"%";
+  const v={
+    id, pair:d.pair, live:true, curated:!!cur,
+    cf:o.cf, lt:o.lt, lml:o.lml, liqPen:o.pen+"%", lmax:o.lmax, pos:o.pos,
+    maxLev:o.maxLev, exLev:o.exLev, verdict:o.maxLev>=0?"green":"red",
+    vol:c.vol, srcNow:c.src, dur:c.dur, rewSup:o.rewSup, rewBor:o.rewBor,
+    colNetEx:o.colNetEx, debtNetEx:o.debtNetEx, spreadEx:o.spreadEx, spread:o.spread,
+    colBase:o.colBase, debtBase:o.debtBase, L:o.L,
+    colLend:o.colLend, colStake:o.colStake, colTrade:o.colTrade, colRew:o.colRew,
+    debtLend:o.debtLend, debtStake:o.debtStake, debtTrade:o.debtTrade, debtRew:o.debtRew,
+    col:{net:o.col.net,trading:o.col.trading,tokens:o.col.tokens},
+    debt:{net:o.debt.net,trading:o.debt.trading,tokens:o.debt.tokens},
+    /* fee and pool identity now come from the API instead of the hand-written "~" placeholders */
+    fee:o.col.isDex?feeTxt(o.col):(o.debt.isDex?feeTxt(o.debt):"—"),
+    trade:o.col.trading===o.debt.trading?o.col.trading.toFixed(2)+"%"
+         :o.col.trading.toFixed(2)+"% / "+o.debt.trading.toFixed(2)+"%",
+    caps:(o.col.fill!=null?o.col.fill.toFixed(0)+"%":"—")+" / "+(o.debt.fill!=null?o.debt.fill.toFixed(0)+"%":"—"),
+    /* the two sides share ONE pool only on a type-4 vault whose DEX addresses match */
+    onePool:!!(o.col.isDex&&o.debt.isDex&&o.col.dexAddr&&o.col.dexAddr===o.debt.dexAddr),
+    colIsDex:o.col.isDex, debtIsDex:o.debt.isDex,
+    driver:(cur&&cur.driver)||g.driver,
+    confirmed:cur?cur.confirmed:null,
+    tvl:o.col.usd,
+  };
+  const p=(cur&&PROSE[id])?PROSE[id](v):g;
+  v.lede=p.lede; v.why=p.why;
+  if(o.rewSup||o.rewBor){
+    /* "GREEN even without rewards" was true but materially misleading on v125: ex-reward the
+       debt leg costs MORE than the collateral earns, so the loop returns less than just
+       holding the collateral — leverage is destroying value, and the positive sign comes
+       only from the +B term in L·(S−B) + B. Say that plainly instead. */
+    const hurts=o.spreadEx<0;
+    v.exRew=`Ex-rewards: ${o.colNetEx.toFixed(2)}% × ${o.lmax} − ${o.debtNetEx.toFixed(2)}% × ${(Math.round((o.L-1)*10)/10)} = <b class='${o.exLev<0?"neg":"pos"}'>${f(o.exLev,true)}</b>. `
+      +((o.exLev<0&&o.maxLev>=0)
+        ? `Rewards are the entire reason it is green.`
+        : o.exLev<0
+        ? `Still ${f(o.maxLev,true)} with the campaign running — the rewards are worth ${sgn(o.maxLev-o.exLev,2)}pp and are not enough to clear zero.`
+        : hurts
+          ? `Still positive — but the <b>ex-reward</b> spread is <b class="neg">${sgn(o.spreadEx,2)}%</b> (debt ${o.debtNetEx.toFixed(2)}% costs more than collateral ${o.colNetEx.toFixed(2)}% earns), so <b>leverage is working against you</b>: unlevered you would earn ${f(o.colNetEx,true)}, and looping to ${o.lmax}× cuts that to ${f(o.exLev,true)}. Without the campaign this is a worse trade than simply holding the collateral.`
+          : `Green on its own merits — the ex-reward spread is ${sgn(o.spreadEx,2)}%, so leverage adds to it even without the campaign.`)
+      +(o.rewEnd?` Campaign ends ${o.rewEnd}.`:"");
+  }
+  return v;
+}
+
 function applyFluid(vaults,byid){
+  /* viewOf() builds every teardown from DEC{} now, so the old per-field writes into V[] were
+     dead — including a PROSE re-run whose output nothing rendered. V[] survives only as the
+     pre-fetch fallback and as the baseline evalVerdicts() compares against, so the single
+     field still worth refreshing is maxLev (drives the FLIPS list and the {V51} substitution). */
   for(const id of ORDER){
     const raw=byid[String(id)]; if(!raw) continue;
-    const o=decompose(raw), cls=classify(o), v=V[id];
-    v.live=true; v.cf=o.cf; v.lt=o.lt; v.lml=o.lml; v.liqPen=o.pen+"%"; v.lmax=o.lmax; v.pos=o.pos;
-    v.trade=o.col.trading===o.debt.trading?o.col.trading.toFixed(2)+"%":o.col.trading.toFixed(2)+"% / "+o.debt.trading.toFixed(2)+"%";
-    v.caps=(o.col.fill!=null?o.col.fill.toFixed(0)+"%":"—")+" / "+(o.debt.fill!=null?o.debt.fill.toFixed(0)+"%":"—");
-    v.col={net:o.col.net,trading:o.col.trading,tokens:o.col.tokens};
-    v.debt={net:o.debt.net,trading:o.debt.trading,tokens:o.debt.tokens};
-    v.maxLev=o.maxLev; v.verdict=o.maxLev>=0?"green":"red"; v.vol=cls.vol; v.srcNow=cls.src;
-    v.rewSup=o.rewSup; v.rewBor=o.rewBor; v.exLev=o.exLev;
-    const p=PROSE[id](v); v.lede=p.lede; v.why=p.why;
-    if(id===61){
-      const exS=(v.col.net-o.rewSup).toFixed(2), exB=(v.debt.net+o.rewBor).toFixed(2);
-      v.exRew=`Ex-rewards: ${exS}% × ${o.lmax} − ${exB}% × ${(Math.round((o.L-1)*10)/10)} = <b class='${o.exLev<0?"neg":"pos"}'>${f(o.exLev,true)}</b> (${o.exLev<0?"RED":"GREEN"}). ${o.exLev<0?"Rewards are the entire reason it is green.":"Now green even without rewards — verdict changed."}${o.rewEnd?` Campaign ends ${o.rewEnd}.`:""}`;
-    }
+    const o=decompose(raw);
+    V[id].live=true; V[id].maxLev=o.maxLev; V[id].verdict=o.maxLev>=0?"green":"red";
   }
   /* leaderboards + study, recomputed across all live DEX vaults */
   const dex=vaults.filter(x=>+x.type>1);
+  for(const k in DEC) delete DEC[k];
   const rows=dex.map(raw=>{try{
     const o=decompose(raw), c=classify(o);
+    /* Retain the FULL decomposition per vault, not just the nine board scalars — this is
+       what lets any row in the board open the same teardown the curated four get. */
+    DEC[+raw.id]={o,c,pair:o.colPair+" → "+o.debtPair,vaultAddr:raw.address||null};
     return {id:+raw.id,pair:o.colPair+" → "+o.debtPair,T:"T"+o.type,
       col:+(o.col.usd/1e6).toFixed(1),eq:+((o.col.usd-o.debt.usd)/1e6).toFixed(1),debt:+(o.debt.usd/1e6).toFixed(1),
-      util:o.col.usd?Math.round(100*o.debt.usd/o.col.usd):0,cap:o.col.fill!=null?Math.round(o.col.fill):0,
-      pos:o.pos,lev:o.maxLev,src:c.src,dur:c.dur,green:o.maxLev>=0,inc:c.inc,vol:c.vol,exLev:o.exLev};
+      util:o.col.usd?Math.round(100*o.debt.usd/o.col.usd):0,cap:o.col.fill!=null?Math.round(o.col.fill):null,
+      usd:o.col.usd,
+      pos:o.pos,lev:o.maxLev,src:c.src,dur:c.dur,green:o.maxLev>=0,inc:c.inc,heavy:c.heavy,vol:c.vol,
+      exLev:o.exLev,spreadEx:o.spreadEx,colNetEx:o.colNetEx,
+      /* unlevered return IS the net supply leg: at L=1 the identity is 1·S − 0·B = S */
+      spread:o.spread,unlev:o.col.net};
   }catch(e){return null;}}).filter(Boolean);
   LB.all=rows;
   const bh=document.getElementById("board-note-head");
-  if(bh)bh.textContent=rows.length+" vaults · live from the Fluid API · click a column to sort";
+  if(bh)bh.textContent=rows.length+" vaults · live from the Fluid API · click a row to expand, a column to sort";
   const by=k=>(a,b)=>b[k]-a[k];
   LB.yield_=rows.filter(r=>r.green&&!r.inc&&r.col>2&&r.id!==77).sort(by("lev")).slice(0,6);
   const g=rows.find(r=>r.id===61); if(g) LB.gho={id:61,pair:g.pair,col:g.col,pos:g.pos,util:g.util,lev:g.exLev,wrew:g.lev};
   const a=rows.find(r=>r.id===77); if(a) LB.anomaly={id:77,pair:a.pair,col:a.col,pos:a.pos,lev:a.lev};
-  if(byid["44"]&&byid["51"]){
+  /* wstETH-debt counterfactual. Tokens are selected BY SYMBOL: reading them positionally
+     silently inverts the whole study if Fluid ever reorders a pair. */
+  if(byid["44"]){
     const o44=decompose(byid["44"]);
-    const wst_bor=o44.debt.tokens[0].base, wst_stk=o44.debt.tokens[0].staking, eth_bor=o44.debt.tokens[1].base;
-    LB.rates={wst_bor,eth_bor,wst_stk};
-    const per1x=wst_bor+wst_stk-eth_bor;
-    LB.wst=["44","74","159","78","80","104"].map(id=>{
-      const raw=byid[id]; if(!raw) return null;
-      const o=decompose(raw), delta=+(per1x*(o.L-1)).toFixed(2);
-      return {id,pair:o.colPair+" → "+o.debtPair,lmax:o.lmax,col:+(o.col.usd/1e6).toFixed(1),now:o.maxLev,eth:+(o.maxLev+delta).toFixed(2),delta,green:o.maxLev>=0};
-    }).filter(Boolean);
-    /* live fee comparables for the spoke projections */
-    const o51=decompose(byid["51"]);
-    FEECOMP.btc=+((o51.col.trading+o51.debt.trading)/2).toFixed(2);
-    FEECOMP.eth=o44.col.trading;
+    const W=o44.debt.tokens.find(t=>t.n==="wstETH"), E=o44.debt.tokens.find(t=>t.n==="ETH");
+    if(W&&E){
+      LB.rates={wst_bor:W.base,eth_bor:E.base,wst_stk:W.staking};
+      const per1x=W.base+W.staking-E.base;
+      LB.wst=["44","74","159","78","80","104"].map(id=>{
+        const raw=byid[id]; if(!raw) return null;
+        const o=decompose(raw);
+        /* Weight by the wstETH SHARE of the debt leg. v44's debt is a wstETH-ETH pool
+           (~90/10), not pure wstETH — applying the full per-1× delta overstated it, and
+           v44 is the headline row that sets the top of the quoted range. */
+        const w=o.debt.tokens.find(t=>t.n==="wstETH");
+        const share=w?w.w/100:0;
+        if(!share) return null;
+        const delta=+(per1x*(o.L-1)*share).toFixed(2);
+        return {id,pair:o.colPair+" → "+o.debtPair,lmax:o.lmax,col:+(o.col.usd/1e6).toFixed(1),
+          now:o.maxLev,eth:+(o.maxLev+delta).toFixed(2),delta,green:o.maxLev>=0,
+          share:+(share*100).toFixed(1),pool:o.debt.tokens.length>1};
+      }).filter(Boolean);
+    }
   }
+  /* live fee comparables for the spoke projections — independent of the wstETH study above,
+     so a missing v44 no longer silently freezes the BTC comparable too */
+  if(byid["51"]){ const o=decompose(byid["51"]); FEECOMP.btc={col:o.col.trading,debt:o.debt.trading}; }
+  if(byid["44"]){ const o=decompose(byid["44"]); FEECOMP.eth={col:o.col.trading,debt:o.debt.trading}; }
 }
 
 function rebuildMerkl(opps){
@@ -1182,16 +1649,26 @@ function rebuildMerkl(opps){
   const rel=[],seen=new Set(),matched=new Set();
   for(const m of MAP) for(const o of live){
     if(seen.has(o.id)||!m.test(o)) continue;
-    seen.add(o.id);
     const apr=+o.apr;
-    if(!Number.isFinite(apr)) continue;                      // malformed apr: skip, keep last-good
+    /* Finiteness is checked BEFORE consuming the opportunity. The check used to sit after
+       seen.add(), so one malformed apr both blocked every later MAP rule from matching that
+       row AND left the key out of `matched` — which the expiry loop below then read as
+       "campaign ended", blanking a live incentive. */
+    if(!Number.isFinite(apr)){
+      if(m.key) matched.add(m.key);        // matched but unusable: keep the last-good value
+      continue;
+    }
+    seen.add(o.id);
     const side=o.action==="BORROW"?"borrow rebate":"supply";
     const tok=(((o.rewardsRecord||{}).breakdowns||[])[0]||{}).token;
     rel.push({camp:o.name,side,apr:"+"+apr.toFixed(2)+"%",tok:tok?tok.symbol:"—",end:fmtEnd(o.earliestCampaignEnd),appl:m.appl});
     if(m.key&&!matched.has(m.key)){LASTINC[m.key]=apr;matched.add(m.key);}
   }
-  /* successful fetch: any known key NOT matched is ended/unrenewed — expire it */
-  for(const k of Object.keys(LASTINC)) if(!matched.has(k)) LASTINC[k]=null;
+  /* Expire unmatched keys ONLY when the response actually carried campaigns. An empty or
+     truncated page is not evidence that a campaign ended — and the endpoint caps `items`
+     server-side, so a growing opportunity set could otherwise silently push a live campaign
+     out of the window and have the page report it as "ended/unrenewed". */
+  if(live.length) for(const k of Object.keys(LASTINC)) if(!matched.has(k)) LASTINC[k]=null;
   INCENT.length=0;
   if(rel.length) INCENT.push(...rel);
   else INCENT.push({camp:"No live Aave campaigns matched",side:"—",apr:"—",tok:"—",end:"—",appl:"with-incentive columns show — until a campaign returns"});
@@ -1199,28 +1676,41 @@ function rebuildMerkl(opps){
 
 /* §03 projections: static Aave borrow legs + external-yield supply estimates (raw, labeled),
    recomputed through the loop identity with LIVE Merkl incentives and LIVE Fluid fee comparables */
+/* Each structure names the debt tokens it actually borrows and the hub it borrows them in,
+   so the borrow leg is READ LIVE from the Aave API rather than carried as a scraped number.
+   `bor` is the 2026-07-15 fallback, used only until the first successful Aave fetch.
+   Supply legs stay external native-yield estimates — they accrue off Aave's book. */
 const PROJLEGS=[
-  {sup:1.5, bor:0.26,fee:"btc",incKey:null,          note:"+ LBTC points on top (unpriced)"},
-  {sup:6.0, bor:2.51,fee:null, incKey:"susde",side:"supply",note:"the real engine — green before any incentive; funding variable"},
-  {sup:0.0, bor:0.26,fee:"btc",incKey:null,          note:"fee vault — base alone is red, fees are the story"},
-  {sup:2.9, bor:2.27,fee:"eth",incKey:"weth",side:"borrow",note:"WETH-borrow rebate cuts the borrow cost"},
-  {sup:2.2, bor:2.27,fee:"eth",incKey:null,          note:"thin — staking ≈ borrow"},
-  {sup:1.25,bor:2.34,fee:null, incKey:"usdgfrx",side:"supply",note:"negative base, incentive-flipped"},
+  {sup:1.5, bor:0.26,hub:"Core",debt:["WBTC","cbBTC"], fee:"btc",incKey:null,          note:"+ LBTC points on top (unpriced)"},
+  {sup:6.0, bor:2.51,hub:"Plus",debt:["USDC","USDT"],  fee:null, incKey:"susde",side:"supply",note:"the real engine — green before any incentive; funding variable"},
+  {sup:0.0, bor:0.26,hub:"Core",debt:["WBTC","cbBTC"], fee:"btc",incKey:null,          note:"fee vault — base alone is red, fees are the story"},
+  {sup:2.9, bor:2.27,hub:"Core",debt:["WETH"],         fee:"eth",incKey:"weth",side:"borrow",note:"WETH-borrow rebate cuts the borrow cost"},
+  {sup:2.2, bor:2.27,hub:"Core",debt:["WETH"],         fee:"eth",incKey:null,          note:"thin — staking ≈ borrow"},
+  {sup:1.25,bor:2.34,hub:"Core",debt:["USDG","frxUSD"],fee:null, incKey:"usdgfrx",side:"supply",note:"negative base, incentive-flipped"},
 ];
+const PROJ_L=10;   /* the stated yardstick: every structure compared at the same 10× */
 function rebuildProj(){
-  const L=10;
+  const L=PROJ_L;
   const INC=Object.assign({},LASTINC);
   if(INC.usdg!=null&&INC.frx!=null) INC.usdgfrx=(INC.usdg+INC.frx)/2;
   PROJ.forEach((p,i)=>{
     const s=PROJLEGS[i];
-    const base=s.sup*L-s.bor*(L-1);
+    const live=borrowLeg(s.hub,s.debt);
+    const bor=live?live.apy:s.bor;
+    p.borLive=!!live;
+    const base=s.sup*L-bor*(L-1);
     p.base=sgn(base,1)+"%";
-    const feePP=s.fee==="btc"?FEECOMP.btc*(2*L-1):s.fee==="eth"?FEECOMP.eth*L:null;
-    p.fees=feePP!=null?"~"+sgn(base+feePP,0)+"%":"—";
+    /* Fee comparables are per-side: collateral earns ×L, debt rebates ×(L−1). Averaging the
+       two sides only coincides when they are equal, which is not general. A zero comparable
+       is treated as no comparable — otherwise the column silently implies a fee that is
+       not there (v44's collateral-side trading currently reads 0.00%). */
+    const fc=s.fee==="btc"?FEECOMP.btc:s.fee==="eth"?FEECOMP.eth:null;
+    const feePP=fc?(fc.col*L+fc.debt*(L-1)):null;
+    p.fees=(feePP&&Math.abs(feePP)>=0.05)?"~"+sgn(base+feePP,0)+"%":"—";
     const inc=(s.incKey&&INC[s.incKey]!=null)?(s.side==="supply"?base+INC[s.incKey]*L:base+INC[s.incKey]*(L-1)):null;
     p.inc=inc!=null?sgn(inc,1)+"%":"—";
     p.usd=(base<0?"−$":"+$")+Math.abs(base*0.1).toFixed(1)+"M";
-    p.sup=(s.sup?"~"+s.sup:"~0")+"%"; p.bor=s.bor.toFixed(2)+"%"; p.note=s.note;
+    p.sup=(s.sup?"~"+s.sup:"~0")+"%"; p.bor=bor.toFixed(2)+"%"; p.note=s.note;
   });
 }
 
@@ -1234,10 +1724,13 @@ function verdictChips(){
   const c2rented=b(6)<0&&p[6].inc!=="—"&&pnum(p[6].inc)>0;
   const c3thin=b(5)<5;
   const ghoRented=LB.gho.lev<0&&LB.gho.wrew>0;
+  /* depth figures read from the live Aave hub rather than repeating the scraped strings */
+  const btcD=borrowLeg("Core",["WBTC","cbBTC"]), plusD=borrowLeg("Plus",["USDC","USDT"]), wethD=borrowLeg("Core",["WETH"]);
+  const btcTxt=btcD?usdShort(btcD.usd):"~$50M", plusTxt=plusD?usdShort(plusD.usd):"$2.9M", wethTxt=wethD?usdShort(wethD.usd):"$3.09M";
   return `
-    <div class="vchip ${c1ok?'good':'lean'}"><div class="vh"><span class="famdot fam-btc"></span>BTC pairs + sUSDe ${c1ok?'':flip}</div><div class="vb">${c1ok?'<b>Positive base carry without incentives.</b> ~$50M BTC + $2.9M sUSDe of un-subsidized depth (vs one $3.09M WETH pool), and the only wide organic spread (sUSDe funding).':`<b>Changed.</b> Base carry no longer positive on ${b(1)<=0?'#1':''}${b(1)<=0&&b(2)<=0?' and ':''}${b(2)<=0?'#2':''} — the positive-carry finding no longer holds.`}</div></div>
+    <div class="vchip ${c1ok?'good':'lean'}"><div class="vh"><span class="famdot fam-btc"></span>BTC pairs + sUSDe ${c1ok?'':flip}</div><div class="vb">${c1ok?`<b>Positive base carry without incentives.</b> ${btcTxt} BTC + ${plusTxt} Plus-stable of un-subsidized borrowable depth (vs one ${wethTxt} WETH pool), and the only wide organic spread (sUSDe funding).`:`<b>Changed.</b> Base carry no longer positive on ${b(1)<=0?'#1':''}${b(1)<=0&&b(2)<=0?' and ':''}${b(2)<=0?'#2':''} — the positive-carry finding no longer holds.`}</div></div>
     <div class="vchip ${c2rented?'rent':'lean'}"><div class="vh"><span class="famdot fam-stable"></span>Stables ${c2rented===SNAPSIGN.projBase[5]?flip:''}</div><div class="vb">${c2rented?'<b>Incentive-dependent.</b> Green only while Merkl campaigns pay — currently short, weekly-renewed tranches (dates in §04).':(b(6)>=0?'<b>Base turned positive</b> — no longer purely incentive-dependent; re-verify against §04.':'<b>Not green even with incentives</b> — current Merkl campaigns do not flip the sign.')}</div></div>
-    <div class="vchip lean"><div class="vh"><span class="famdot fam-eth"></span>ETH pairs ${c3thin?'':flip}</div><div class="vb">${c3thin?'<b>Thin.</b> One shared $3.09M WETH pool; staking ≈ borrow cost, so carry rests on swap fees and one rebate.':'<b>No longer thin</b> — the wstETH loop base moved above +5%; the thin-carry finding no longer holds.'}</div></div>
+    <div class="vchip lean"><div class="vh"><span class="famdot fam-eth"></span>ETH pairs ${c3thin?'':flip}</div><div class="vb">${c3thin?`<b>Thin.</b> One shared ${wethTxt} WETH pool; staking ≈ borrow cost, so carry rests on swap fees and one rebate.`:'<b>No longer thin</b> — the wstETH loop base moved above +5%; the thin-carry finding no longer holds.'}</div></div>
     <div class="vchip warn"><div class="vh"><span class="famdot" style="background:var(--t0)"></span>GHO ${ghoRented?'':flip}</div><div class="vb">${ghoRented?'<b>Green on rewards alone.</b> The one live GHO vault (Fluid) is negative ex-reward — no organic comparable exists.':'<b>Changed:</b> Fluid GHO-USDC is now '+(LB.gho.lev>=0?'green even ex-reward':'red with rewards too')+' — the finding no longer holds.'}</div></div>`;
 }
 function evalVerdicts(){
@@ -1261,25 +1754,31 @@ async function rpc(method,params){
 }
 
 function paintSources(){
-  const dot=s=>s==="live"?"live":s==="stale"?"stale":s==="snapshot"?"static":"wait";
-  const lbl=(name,s)=>`${name}: ${s.state==="live"?"live "+s.at:s.state==="stale"?"STALE — kept "+s.at:"snapshot 2026-07-15"}`;
-  document.getElementById("srcline").innerHTML=`
-    <span class="src"><span class="sdot ${dot(SRC.fluid.state)}"></span>${lbl("Fluid",SRC.fluid)}</span>
-    <span class="src"><span class="sdot ${dot(SRC.merkl.state)}"></span>${lbl("Merkl",SRC.merkl)}</span>
-    <span class="src"><span class="sdot ${SRC.chain.state==="live"?"live":SRC.chain.block?"stale":"wait"}"></span>${SRC.chain.block?"Ethereum block "+SRC.chain.block.toLocaleString()+(SRC.chain.state==="stale"?" · STALE — kept ":" · ")+SRC.chain.at:"Chain: unavailable"}</span>
-    <span class="src"><span class="sdot static"></span>Aave hubs + CF: static 2026-07-15 · manual refresh only</span>
-    ${FLIPS.length?`<span class="src"><span class="flip">${FLIPS.length} verdict flip${FLIPS.length>1?"s":""} vs snapshot:</span> ${FLIPS.join(" · ")}</span>`:""}`;
-  const st=s=>s.state==="live"?`live ${s.at}`:s.state==="stale"?`STALE (kept ${s.at})`:"snapshot 2026-07-15";
-  document.getElementById("asof").textContent=
-    `Fluid ${st(SRC.fluid)} · Merkl ${st(SRC.merkl)}${SRC.chain.block?" · block "+SRC.chain.block.toLocaleString():""} · Aave static 2026-07-15`;
+  const dot=s=>s==="live"?"live":s==="stale"?"stale":s==="snapshot"?"static":s==="failed"?"stale":"wait";
+  const lbl=(name,s)=>`${name}: ${s.state==="live"?"live "+s.at:s.state==="stale"?"STALE — kept "+s.at:s.state==="failed"?"unavailable":"snapshot "+SNAPDATE}`;
+  /* Report by exception. Healthy sources collapse to a dot and a name with the clock printed
+     ONCE; anything not live is spelled out in full, which is the only time that detail earns
+     its space. Previously all four printed "live HH:MM" and the clock appeared 5× in the header. */
+  const named=[["Fluid",SRC.fluid],["Merkl",SRC.merkl],["Aave v4",SRC.aave]];
+  const ok=named.filter(([,x])=>x.state==="live"), bad=named.filter(([,x])=>x.state!=="live");
+  const chainOk=SRC.chain.state==="live";
+  const clock=ok.length?ok[0][1].at:(chainOk?SRC.chain.at:null);
+  const good=[...ok.map(([n])=>n), ...(chainOk?[`block ${SRC.chain.block.toLocaleString()}`]:[])];
+  document.getElementById("srcline").innerHTML=
+    (good.length?`<span class="src"><span class="sdot live"></span>${good.join(" · ")}${clock?` — live ${clock}`:""}</span>`:"")
+    + bad.map(([n,x])=>`<span class="src"><span class="sdot ${dot(x.state)}"></span>${lbl(n,x)}</span>`).join("")
+    + (!chainOk&&SRC.chain.state!=="wait"?`<span class="src"><span class="sdot stale"></span>Ethereum RPC ${SRC.chain.block?`STALE — kept block ${SRC.chain.block.toLocaleString()}`:"unavailable"}</span>`:"")
+    + (merklRetry?`<span class="src"><span class="sdot wait"></span>retrying Merkl in ~1m…</span>`:"")
+    + (FLIPS.length?`<span class="src"><span class="flip">${FLIPS.length} verdict flip${FLIPS.length>1?"s":""} vs snapshot:</span> ${FLIPS.join(" · ")}</span>`:"");
 }
 async function refresh(){
   const btn=document.getElementById("refreshbtn");
   btn.disabled=true; btn.classList.add("loading");
   const t=new Date().toLocaleTimeString("en-US",{hour12:false,hour:"2-digit",minute:"2-digit"});
-  const [fl,mk,ch]=await Promise.allSettled([
+  const [fl,mk,av,ch]=await Promise.allSettled([
     fetch(ENDPOINTS.vaults).then(r=>r.json()),
     fetch(ENDPOINTS.merkl).then(r=>r.json()),
+    fetchAave(),
     rpc("eth_blockNumber",[]),
   ]);
   if(fl.status==="fulfilled"&&Array.isArray(fl.value)){
@@ -1309,10 +1808,26 @@ async function refresh(){
       },75000);
     }
   }
+  /* Aave v4 hubs — live from api.aave.com/graphql. On failure the 2026-07-15 fallback stays
+     in place and the source is flagged, rather than being repainted as if it were current. */
+  if(av.status==="fulfilled"){
+    try{ applyAave(av.value); SRC.aave={state:"live",at:t}; }
+    catch(e){ SRC.aave.state=SRC.aave.state==="live"?"stale":"snapshot"; console.warn("aave apply failed, kept last:",e); }
+  } else {
+    SRC.aave.state=SRC.aave.state==="live"?"stale":"snapshot";
+    console.warn("aave fetch failed:",av.reason);
+  }
   rebuildProj();
   if(ch.status==="fulfilled"){ SRC.chain={state:"live",at:t,block:parseInt(ch.value,16)}; }
-  else if(SRC.chain.block) SRC.chain.state="stale";
+  else SRC.chain.state=SRC.chain.block?"stale":"failed";
+  /* A throw in the render pipeline used to escape to a bare console.error, leaving a
+     half-updated page behind a button that looked like it had succeeded. */
   try{ evalVerdicts(); paintSources(); rerender(); }
+  catch(e){
+    console.error("render failed:",e);
+    const sl=document.getElementById("srcline");
+    if(sl) sl.innerHTML=`<span class="src"><span class="flip">render failed — figures below may be partial. Press Refresh.</span></span>`;
+  }
   finally{ btn.disabled=false; btn.classList.remove("loading"); }
 }
 
@@ -1341,7 +1856,7 @@ const ENGCLS={"Native yield":"native","Swap fees":"fees","Base carry":"base","In
 function ensureRows(){
   if(LB.all) return;
   const seen={},rows=[];
-  [...LB.scale,...LB.demand,...LB.yield_].forEach(r=>{ if(!seen[r.id]){seen[r.id]=1;rows.push({...r});} });
+  [...LB.scale,...LB.yield_].forEach(r=>{ if(!seen[r.id]){seen[r.id]=1;rows.push({...r});} });
   if(!seen[61]) rows.push({id:61,pair:LB.gho.pair,T:"T4",col:LB.gho.col,eq:+(LB.gho.col-5.9).toFixed(1),debt:5.9,util:LB.gho.util,cap:null,pos:LB.gho.pos,lev:LB.gho.wrew,src:"Incentive",dur:"—",green:LB.gho.wrew>=0,inc:true,vol:false,exLev:LB.gho.lev});
   if(!seen[77]) rows.push({id:77,pair:LB.anomaly.pair,T:"T4",col:LB.anomaly.col,eq:+(LB.anomaly.col-4.2).toFixed(1),debt:4.2,util:Math.round(100*4.2/LB.anomaly.col),cap:null,pos:LB.anomaly.pos,lev:LB.anomaly.lev,src:"Swap fees",dur:"Volume-dep",green:true,inc:false,vol:true});
   LB.all=rows;
@@ -1350,11 +1865,18 @@ function ensureRows(){
 /* --- KPIs --- */
 function renderKPIs(){
   ensureRows();
-  document.getElementById("kpi-vaults").textContent=SRC.fluid.state==="live"?LB.all.length:"43 (snap)";
-  document.getElementById("kpi-greens").textContent=LB.all.filter(r=>r.green&&!r.inc).length;
-  const liveN=[SRC.fluid,SRC.merkl,SRC.chain].filter(s=>s.state==="live").length;
-  document.getElementById("kpi-sources").textContent=liveN+" / 3 live";
-  document.getElementById("kpi-updated").textContent=SRC.fluid.state==="live"?SRC.fluid.at:"07-15 snap";
+  const live=SRC.fluid.state==="live";
+  /* The count used to read a hard-coded "43 (snap)" over a 10-row snapshot board, implying
+     33 vaults had been evaluated and found wanting. Both numbers now come from the same rows. */
+  document.getElementById("kpi-vaults").textContent=live?LB.all.length:LB.all.length+" (subset)";
+  document.getElementById("kpi-greens").textContent=live?LB.all.filter(r=>r.green&&!r.inc).length:"—";
+  /* the sources bar directly above already itemises freshness — this tile earns its place by
+     showing something the bar cannot: how much of the board leans on a campaign */
+  const tot=LB.all.reduce((a,r)=>a+r.col,0);
+  const sub=LB.all.filter(r=>r.heavy).reduce((a,r)=>a+r.col,0);
+  document.getElementById("kpi-sources").textContent=(live&&tot)?Math.round(100*sub/tot)+"%":"—";
+  document.getElementById("kpi-updated").textContent=
+    live?usdShort(LB.all.reduce((a,r)=>a+(r.usd||r.col*1e6),0)):"—";
 }
 
 /* --- findings strip (rule-driven, from the live layer) --- */
@@ -1373,22 +1895,58 @@ const COLS=[
   {k:"lev",label:"Max Lev APY",numeric:true,anchor:true},
 ];
 let boardSort={k:"lev",dir:-1}, boardFam="all";
+/* ids currently expanded in the board, and ids the user explicitly un-gated */
+const boardOpen=new Set(), dustOK=new Set();
+const DUST_M=0.5;    /* $M of collateral below which a vault gets a stub, not a full teardown */
+
+/* The board can open ANY vault, including ones the curated leaderboards filtered out. Below
+   the dust floor the full teardown is withheld by default: a four-section decomposition
+   concluding "−35.98% at 14.3×" for a vault with no deposits carries the same visual
+   authority as the $35.8M flagship, which is misleading rather than informative. */
+function expandHTML(r){
+  const v=viewOf(r.id);
+  if(!v) return `<div class="expwrap"><p class="board-note" style="margin:0">No live decomposition for vault ${r.id} — press <b>Refresh from source</b>.</p></div>`;
+  /* gate on the raw USD, not the 1dp-rounded $M — a $0.45M vault rounded up and escaped */
+  if(r.usd<DUST_M*1e6&&!dustOK.has(r.id)){
+    return `<div class="expwrap">
+      <p class="dustnote"><b>Vault ${r.id} is effectively unused</b> — ${usdShort(r.usd)} collateral${r.cap!=null?`, ${r.cap}% of its cap`:''}, ${r.pos} position${r.pos===1?'':'s'}.
+      The decomposition below still computes (<b class="${r.lev>=0?'pos':'neg'}">${f(r.lev,true)}</b> at ${v.lmax}×), but on this little
+      deposited it describes an idea rather than a market.</p>
+      <button class="btn ghost dustbtn" data-dust="${r.id}" type="button">Show the full teardown anyway</button>
+    </div>`;
+  }
+  return `<div class="expwrap">${tdHTML(v)}</div>`;
+}
 function renderBoard(){
   ensureRows();
   const rows=LB.all.filter(r=>boardFam==="all"||famOf(r.pair)===boardFam).slice();
   const c=COLS.find(c=>c.k===boardSort.k);
   rows.sort((a,b)=>{
     const va=c.sort?c.sort(a):a[c.k], vb=c.sort?c.sort(b):b[c.k];
+    /* null-safe: cap-fill is genuinely null for a side with no DEX pool, and `null - 35`
+       is NaN — an inconsistent comparator whose output differs between asc and desc passes.
+       Nulls always sort last, whichever direction is active. */
+    if(va==null&&vb==null) return 0;
+    if(va==null) return 1;
+    if(vb==null) return -1;
     return (typeof va==="string"? va.localeCompare(vb) : va-vb)*boardSort.dir;
   });
-  document.querySelector("#board thead").innerHTML="<tr>"+COLS.map(c=>
-    `<th class="${c.numeric?'numeric':''} ${boardSort.k===c.k?'sorted':''}" data-k="${c.k}">${c.label}<span class="arrow">${boardSort.k===c.k?(boardSort.dir<0?"▼":"▲"):"▼"}</span></th>`
-  ).join("")+"</tr>";
+  /* real button semantics + aria-sort: the headers were mouse-only, and every column
+     rendered a caret so the default view looked like nine simultaneously-sorted columns */
+  document.querySelector("#board thead").innerHTML="<tr>"+COLS.map(c=>{
+    const on=boardSort.k===c.k;
+    return `<th scope="col" class="${c.numeric?'numeric':''} ${on?'sorted':''}" data-k="${c.k}"
+      aria-sort="${on?(boardSort.dir<0?'descending':'ascending'):'none'}">
+      <button type="button" class="thbtn">${c.label}<span class="arrow">${on?(boardSort.dir<0?"▼":"▲"):""}</span></button></th>`;
+  }).join("")+"</tr>";
   document.querySelector("#board tbody").innerHTML=rows.map(r=>{
     const fam=famOf(r.pair);
     const unv=r.id===77;
-    return `<tr class="${unv?'unv':''}">
-      <td><div class="pool-cell"><span class="name">${r.pair} ${unv?'<span class="unvchip">unverified</span>':''}</span><span class="tokens mono">${r.T} · vault ${r.id}</span></div></td>
+    const open=boardOpen.has(r.id);
+    const can=!!DEC[r.id];                       // only expandable once a live decomposition exists
+    return `<tr class="${unv?'unv ':''}${can?'expandable ':''}${open?'is-open':''}" data-row="${r.id}"${
+        can?` tabindex="0" role="button" aria-expanded="${open}" aria-controls="exp-${r.id}" title="Open the full teardown for vault ${r.id}"`:''}>
+      <td><div class="pool-cell"><span class="name">${can?`<span class="rowcaret" aria-hidden="true">▶</span>`:''}${r.pair} ${unv?'<span class="unvchip">unverified</span>':''}</span><span class="tokens mono">${r.T} · vault ${r.id}</span></div></td>
       <td><span class="chip fam"><span class="famdot fam-${fam}" style="margin-right:5px;vertical-align:-1px;display:inline-block"></span>${FAMLABEL[fam]}</span></td>
       <td><span class="chip ${ENGCLS[r.src]||'base'}" title="Durability: ${r.dur}">${r.src}</span></td>
       <td class="numeric">$${r.col.toFixed(1)}M</td>
@@ -1396,18 +1954,58 @@ function renderBoard(){
       <td class="numeric">${r.util}%</td>
       <td class="numeric">${r.cap==null?"—":r.cap+"%"}</td>
       <td class="numeric">${r.pos}</td>
-      <td class="apy-anchor ${r.lev>=0?'pos':'neg'}">${f(r.lev,true)}${r.vol?' <span class="vol" title="swap-fee driven — drifts intraday">⇅</span>':''}</td>
-    </tr>`;
+      <td class="apy-anchor ${r.lev>=0?'pos':'neg'}">${f(r.lev,true)}${r.vol?' <span class="vol" title="swap-fee driven — drifts intraday">⇅</span>':''}${
+        r.heavy?`<span class="exrew-line${(r.inc||r.spreadEx<0)?' flips':''}" title="${r.inc
+            ?`Without the Merkl campaign this vault is ${f(r.exLev,true)} — the subsidy is the only reason it is green`
+            :(r.spreadEx<0&&r.green)
+              ?`Without the Merkl campaign the carry spread is ${sgn(r.spreadEx,2)}% — debt costs more than collateral earns, so looping returns LESS than holding it unlevered (${f(r.colNetEx,true)}). The subsidy is what makes the loop worth doing.`
+            :r.spreadEx<0
+              ?`The subsidy is worth ${sgn(r.lev-r.exLev,2)}pp and still does not clear zero — this vault pays ${f(r.lev,true)} even with the campaign running.`
+              :`Without the Merkl campaign this vault is ${f(r.exLev,true)}${r.green?" — still green, and the spread is positive":""}`}">${f(r.exLev,true)} ex-reward${
+            (!r.inc&&r.spreadEx<0)?' ⚠':''}</span>`
+        /* Not reward-related: a green vault whose CARRY SPREAD is negative still returns less
+           than holding the collateral unlevered, because L·(S−B)+B < S whenever S < B.
+           Four vaults on the board look green while leverage is actively costing the holder. */
+        :(r.green&&r.spread<0)?`<span class="exrew-line flips" title="Supply ${r.unlev.toFixed(2)}% is below the ${(r.unlev-r.spread).toFixed(2)}% net borrow cost, so the carry spread is ${sgn(r.spread,2)}%. Looping to leverage returns LESS than simply holding the collateral — ${f(r.lev,true)} at leverage vs ${f(r.unlev,true)} unlevered.">${f(r.unlev,true)} unlevered ⚠</span>`:''}</td>
+    </tr>${open?`<tr class="exprow" id="exp-${r.id}"><td colspan="${COLS.length}">${expandHTML(r)}</td></tr>`:''}`;
   }).join("");
-  const g=LB.gho,a=LB.anomaly;
+  const g=LB.gho, isLive=SRC.fluid.state==="live";
   document.getElementById("board-note").innerHTML=
-    `<b>Two rows carry an asterisk.</b> GHO-USDC (v61) is <b class="${g.lev<0?'neg':'pos'}">${f(g.lev,true)}</b> ex-reward and ${f(g.wrew,true)} only via a temporary Merkl campaign <button class="ghochip" data-goto="gho-pattern">GHO pattern ↗</button>. USDC-ETH (v77) is <span class="unvchip">unverified</span> — not offered in Fluid's Multiply UI, and its swap-fee APY is a point-in-time reading. ⇅ = swap-fee-driven, drifts intraday. $ / utilization / cap-fill / users are <span class="tag r">R</span> (live Fluid API); Max Leverage APY is <span class="tag d">D</span>, recomputed from raw rates on refresh.`;
+    `${isLive?`<b>Click any row</b> to open its full teardown — the same decomposition the curated cards below show, computed for every vault. `:''}<b>Two rows carry an asterisk.</b> GHO-USDC (v61) is <b class="${g.lev<0?'neg':'pos'}">${f(g.lev,true)}</b> ex-reward and ${f(g.wrew,true)} only via a temporary Merkl campaign <button class="ghochip" data-goto="gho-pattern">GHO pattern ↗</button>. Rows marked <span class="unvchip">unverified</span> are not offered in Fluid's Multiply UI, so their APY is computed rather than confirmed against Fluid's own page. ⇅ = swap-fee-driven, drifts intraday. A second figure under an APY is either that vault <b>ex-reward</b> (what it pays once the Merkl subsidy is removed) or its <b>unlevered</b> return. <span style="color:var(--accent);font-weight:600">Amber&nbsp;⚠</span> marks the cases worth pausing on: the carry spread is <b>negative</b>, so <span class="mono">L·(S−B)+B</span> lands <i>below</i> the unlevered supply rate and looping returns less than simply holding the collateral. Those rows are green only because of the subsidy, or green in spite of leverage rather than because of it — and a few are not green at all. ${
+      isLive?`$ / utilization / cap-fill / users are <span class="tag r">R</span> (live Fluid API); Max Leverage APY is <span class="tag d">D</span>, recomputed from raw rates on refresh. A cap-fill of “—” means that side has no DEX pool, so it has no cap to fill.`
+            :`<b>These are the ${SNAPDATE} snapshot rows</b> — a curated subset, not the full vault set — and rows are not expandable until a live fetch lands.`}`;
 }
 document.getElementById("board").addEventListener("click",e=>{
-  const th=e.target.closest("th[data-k]"); if(!th) return;
-  const k=th.dataset.k;
-  if(boardSort.k===k) boardSort.dir*=-1; else boardSort={k,dir:COLS.find(c=>c.k===k).numeric?-1:1};
+  /* un-gate a dust vault */
+  const db=e.target.closest("[data-dust]");
+  if(db){ dustOK.add(+db.dataset.dust); renderBoard(); return; }
+  const th=e.target.closest("th[data-k]");
+  if(th){
+    const k=th.dataset.k;
+    if(boardSort.k===k) boardSort.dir*=-1; else boardSort={k,dir:COLS.find(c=>c.k===k).numeric?-1:1};
+    renderBoard();
+    return;
+  }
+  /* expand / collapse a vault row. Ignore clicks that originated inside an open panel,
+     or the whole teardown would collapse the moment you interacted with it. */
+  if(e.target.closest(".exprow")) return;
+  const tr=e.target.closest("tr.expandable"); if(!tr) return;
+  toggleRow(+tr.dataset.row);
+});
+function toggleRow(id){
+  if(boardOpen.has(id)) boardOpen.delete(id); else boardOpen.add(id);
   renderBoard();
+  if(boardOpen.has(id)){
+    const el=document.querySelector(`tr[data-row="${id}"]`);
+    if(el) el.focus();
+  }
+}
+/* keyboard: rows are role=button, so Enter/Space must work like a click */
+document.getElementById("board").addEventListener("keydown",e=>{
+  const tr=e.target.closest&&e.target.closest("tr.expandable");
+  if(!tr||(e.key!=="Enter"&&e.key!==" ")) return;
+  e.preventDefault();
+  toggleRow(+tr.dataset.row);
 });
 document.getElementById("famfilters").addEventListener("click",e=>{
   const b=e.target.closest("button[data-fam]"); if(!b) return;
@@ -1416,14 +2014,86 @@ document.getElementById("famfilters").addEventListener("click",e=>{
   renderBoard();
 });
 
+/* Build-up ladder — shown on EVERY vault, not just the ones with both fees and rewards.
+   The loop identity is linear in S and B, so it splits exactly into the four engines the page
+   teaches, and the four increments sum to the headline with no residual:
+
+     L·S − (L−1)·B  =  [lending]  +  [staking]  +  [swap fees]  +  [incentives]
+
+   Rows for engines a vault does not have are omitted rather than printed as +0.00pp — that is
+   how each vault "chooses" what appears: the data does, not a hand-written list. */
+function ladder(v){
+  if(v.colLend==null||!v.L) return "";
+  const L=v.L, Lm=L-1;
+  const term=(cs,ds)=>cs*L-ds*Lm;                 // one engine's contribution through the loop
+  const lend   = term(v.colLend,  v.debtLend);
+  const stake  = term(v.colStake, v.debtStake);
+  const fees   = term(v.colTrade, -v.debtTrade);  // fees are income on BOTH sides
+  const inc    = term(v.colRew,   -v.debtRew);    // rewards likewise
+  const total  = lend+stake+fees+inc;
+  const steps=[
+    {k:"stake", lbl:"collateral staking, net of any on the debt", v:stake, cls:"native"},
+    {k:"fees",  lbl:"traders pay both LP sides",                 v:fees,  cls:"fees"},
+    {k:"inc",   lbl:"Merkl campaign, while it runs",             v:inc,   cls:"inc"},
+  ].filter(x=>Math.abs(x.v)>=0.005);
+  if(!steps.length) return `<div class="ladder">
+    <div class="ladder-h">Where the ${f(lend,true)} comes from <span class="tag d">D</span></div>
+    <p class="ladder-foot" style="margin:0"><b>One engine only.</b> No staking, no swap fees and no
+    campaign on this vault — the whole result is the plain lending-minus-borrowing spread, amplified
+    ${Math.round(L*10)/10}×. Nothing here can be switched off to change it.</p></div>`;
+  let run=lend;
+  const row=(lbl,val,delta,cls,chip)=>`<tr${cls?` class="${cls}"`:""}><td>${chip?`<span class="chip ${chip}">${({base:"Base carry",native:"Native yield",fees:"Swap fees",inc:"Incentive"})[chip]}</span>`:""}<span class="ladder-lbl">${lbl}</span></td>
+    <td class="numeric mono ${val>=0?"pos":"neg"}">${f(val,true)}</td>
+    <td class="numeric mono" style="color:var(--text-mute)">${delta==null?"":sgn(delta,2)+"pp"}</td></tr>`;
+  let body=row(`lend minus borrow, nothing else`, lend, null, "", "base");
+  for(const st of steps){ run+=st.v; body+=row(st.lbl, run, st.v, "", st.cls); }
+  body+=row("= the headline", total, null, "total");
+  /* which single engine, if removed, would flip the sign — the one worth watching */
+  const flips=steps.filter(x=>(total-x.v<0)!==(total<0));
+  return `<div class="ladder">
+    <div class="ladder-h">Where the ${f(total,true)} comes from <span class="tag d">D</span>
+      <span class="ladder-note">each engine added in turn, at ${Math.round(L*10)/10}×</span></div>
+    <table><tbody>${body}</tbody></table>
+    <p class="ladder-foot">${
+      flips.length===1
+        ? `<b>${flips[0].k==="inc"?"The incentive":flips[0].k==="fees"?"Swap fees":"Native yield"} alone decides the sign.</b> Remove it and this vault is ${f(total-flips[0].v,true)}.`
+      : flips.length>1
+        ? `<b>No single engine carries it.</b> Removing any one of ${flips.map(x=>x.k==="inc"?"the incentive":x.k==="fees"?"swap fees":"native yield").join(" or ")} flips the sign.`
+      : lend<0
+        ? `The lending spread alone is ${f(lend,true)}; the engines above carry the rest.`
+        : `Every engine here is additive — no single one is load-bearing for the sign.`}</p>
+  </div>`;
+}
+
 /* --- teardown expandable cards --- */
-function tdHTML(id){
-  const v=V[id];
+/* Takes a VIEW object (from viewOf()), not an id — so the same renderer serves the curated
+   teardowns and any row opened from the ranked board. */
+function tdHTML(v){
   const hasRew=anyReward(v.col)||anyReward(v.debt);
-  const incent = hasRew? `<div class="tile"><div class="k">Incentives <span class="tag r">R</span></div><div class="v pos">+${(v.col.tokens.find(k=>k.reward)||{reward:0}).reward}%</div><div class="vsub">Merkl · +${(v.debt.tokens.find(k=>k.reward)||{reward:0}).reward}% borrow rebate</div></div>`
-     : `<div class="tile"><div class="k">Incentives <span class="tag r">R</span></div><div class="v">None</div><div class="vsub">rewards[] empty</div></div>`;
+  /* The headline is what the rewards are WORTH THROUGH THE LOOP, not the raw 1× rate.
+     Showing the raw supply rate meant a vault whose incentive sits entirely on the DEBT side
+     rendered a green "+0%" directly above a subtitle proving a rebate existed — and hid that
+     the rebate was worth tens of points at leverage. maxLev − exLev is that contribution,
+     computed through the same loop identity as everything else on the card. */
+  const incSup=v.rewSup||0, incBor=v.rewBor||0;
+  const incPP=(v.exLev!=null)?(v.maxLev-v.exLev):0;
+  const rented=v.exLev!=null&&v.exLev<0&&v.maxLev>=0;   // green ONLY because of the subsidy
+  const legs=[
+    incSup?`+${incSup.toFixed(2)}% supply ×${v.lmax}`:"",
+    incBor?`+${incBor.toFixed(2)}% borrow rebate ×${Math.round((v.lmax-1)*10)/10}`:"",
+  ].filter(Boolean).join(" · ");
+  /* A vault can be green ex-reward and STILL be a bad loop: when the ex-reward spread is
+     negative, L·(S−B)+B falls below S, i.e. looping returns less than holding the collateral. */
+  const hurtsEx=v.spreadEx!=null&&v.spreadEx<0;
+  const incent = hasRew? `<div class="tile" style="border-color:${rented||hurtsEx?'var(--accent)':'var(--primary-bord)'}">
+      <div class="k">Incentives <span class="tag d">D</span>${rented?'<span class="lq temp" style="margin-left:5px">load-bearing</span>':hurtsEx?'<span class="lq thin" style="margin-left:5px">carries the loop</span>':''}</div>
+      <div class="v" style="color:${(rented||hurtsEx)?'var(--accent)':'var(--pos)'}">${sgn(incPP,1)}pp</div>
+      <div class="vsub">${legs||"Merkl"}<br>${f(v.maxLev,true)} → <b class="${v.exLev>=0?'pos':'neg'}">${f(v.exLev,true)}</b> without${
+        hurtsEx?`<br><span style="color:var(--accent)">ex-reward spread ${sgn(v.spreadEx,2)}% — below unlevered ${f(v.colNetEx,true)}</span>`:''}</div></div>`
+     : `<div class="tile"><div class="k">Incentives <span class="tag r">R</span></div><div class="v">None</div><div class="vsub">no Merkl campaign on this vault</div></div>`;
   return `
-  <p class="conf" style="margin-top:14px"><b>Vault ${v.id}</b> · driver: ${v.driver}${v.srcNow?` · live engine: ${v.srcNow}`:''} · ${v.confirmed?(v.live?'method Fluid-validated (07-15)':'Fluid-confirmed'):'computed only'}</p>
+  <p class="conf" style="margin-top:14px"><b>Vault ${v.id}</b> · driver: ${v.driver}${v.srcNow?` · live engine: ${v.srcNow}${(v.dur&&v.dur!=="—")?` (${v.dur})`:''}`:''}${
+    v.confirmed===false?' · <b>not offered in Fluid\'s Multiply UI</b>':''}</p>
   <div class="tiles">
     <div class="tile" style="border-color:${v.maxLev>=0?'var(--pos)':'var(--neg)'}">
       <div class="k">Max Leverage APY <span class="tag ${v.live?'d':(v.confirmed?'r':'d')}">${v.live?'D':(v.confirmed?'R':'D')}</span></div>
@@ -1437,12 +2107,17 @@ function tdHTML(id){
     <h3 class="sh"><span class="n">01</span>The pool, both sides</h3>
     <div class="diagram">
       <div class="pool-bar">
-        <div class="title"><span class="dot" style="background:${cvar('t0')}"></span><span class="dot" style="background:${cvar('t1')}"></span> ${v.pair} DEX pool</div>
+        <div class="title"><span class="dot" style="background:${cvar('t0')}"></span><span class="dot" style="background:${cvar('t1')}"></span> ${
+          v.onePool?`${v.pair} — one DEX pool, both sides`
+          :v.colIsDex&&v.debtIsDex?`${v.pair} — two separate DEX pools`
+          :v.colIsDex?`${v.pair} — DEX pool collateral, plain lending debt`
+          :v.debtIsDex?`${v.pair} — plain lending collateral, DEX pool debt`
+          :`${v.pair}`}</div>
         <div class="facts"><span>fee ${v.fee}</span><span>trading ${v.trade} <span class="tag r">R</span></span><span>caps ${v.caps}</span></div>
       </div>
       <div class="sides">
         <div class="side lend">
-          <div class="side-head"><span class="lbl">Lend · smart collateral</span><span class="net pos">${v.col.net.toFixed(2)}%</span></div>
+          <div class="side-head"><span class="lbl">Lend · ${v.colIsDex?"smart collateral":"plain collateral"}</span><span class="net pos">${v.col.net.toFixed(2)}%</span></div>
           <div class="side-body">
             <div class="wbar">${weightBar(v.col.tokens)}</div>
             <div class="wcap">weights by value <span class="tag d">D</span> — you HOLD this basket</div>
@@ -1450,7 +2125,7 @@ function tdHTML(id){
           </div>
         </div>
         <div class="side borrow">
-          <div class="side-head"><span class="lbl">Borrow · smart debt</span><span class="net neg">${v.debt.net.toFixed(2)}%</span></div>
+          <div class="side-head"><span class="lbl">Borrow · ${v.debtIsDex?"smart debt":"plain debt"}</span><span class="net neg">${v.debt.net.toFixed(2)}%</span></div>
           <div class="side-body">
             <div class="wbar">${weightBar(v.debt.tokens)}</div>
             <div class="wcap">weights by value <span class="tag d">D</span> — you OWE this basket</div>
@@ -1458,15 +2133,17 @@ function tdHTML(id){
           </div>
         </div>
       </div>
-      <div class="fee-strip"><span>Swap fees from one pool flow to both sides:</span><span><b>+${v.col.trading}%</b> to collateral (income)</span><span style="color:var(--text-mute)">·</span><span><b>+${v.debt.trading}%</b> to debt (offsets borrow)</span></div>
+      ${(v.col.trading||v.debt.trading)?`<div class="fee-strip"><span>${v.onePool?"Swap fees from one pool flow to both sides:":"Swap fees, per side:"}</span><span><b>+${v.col.trading}%</b> to collateral (income)</span><span style="color:var(--text-mute)">·</span><span><b>+${v.debt.trading}%</b> to debt (offsets borrow)</span></div>`
+        :`<div class="fee-strip"><span>No swap-fee leg — neither side is currently earning trading fees.</span></div>`}
       <div class="mathbar">${loopMath(v)}</div>
+      ${ladder(v)}
     </div>
   </section>
   <section>
     <h3 class="sh"><span class="n">02</span>APR per token — rate vs contribution</h3>
     <div class="two">
-      <div class="tbl-wrap"><table><thead><tr><th>Collateral</th><th>wt</th><th>lend</th><th>stake</th>${anyReward(v.col)?'<th>rew</th>':''}<th>= rate</th><th>× wt</th></tr></thead><tbody>${tableRows(v.col,true,v.live)}</tbody></table></div>
-      <div class="tbl-wrap"><table><thead><tr><th>Debt</th><th>wt</th><th>borrow</th><th>stake</th>${anyReward(v.debt)?'<th>reb</th>':''}<th>= rate</th><th>× wt</th></tr></thead><tbody>${tableRows(v.debt,false,v.live)}</tbody></table></div>
+      <div class="tbl-wrap"><table><thead><tr><th>Collateral</th><th>wt</th><th>lend</th><th>stake</th>${anyReward(v.col)?'<th>rew</th>':''}<th>rate</th><th>×wt</th></tr></thead><tbody>${tableRows(v.col,true,v.live)}</tbody></table></div>
+      <div class="tbl-wrap"><table><thead><tr><th>Debt</th><th>wt</th><th>borrow</th><th>stake</th>${anyReward(v.debt)?'<th>reb</th>':''}<th>rate</th><th>×wt</th></tr></thead><tbody>${tableRows(v.debt,false,v.live)}</tbody></table></div>
     </div>
   </section>
   <section>
@@ -1483,41 +2160,47 @@ function tdHTML(id){
     <div class="mech"><table><tbody>
       <tr><td>Liquidation threshold / max / penalty</td><td>${v.lt}% / ${v.lml}% / ${v.liqPen} <span class="tag r">R</span></td></tr>
       <tr><td>Open positions</td><td>${v.pos} <span class="tag r">R</span></td></tr>
-      <tr><td>App Multiply page</td><td>${v.confirmed?'confirmed ✓':'not offered (404)'} <span class="tag ${v.confirmed?'r':'na'}">${v.confirmed?'R':'NA'}</span></td></tr>
+      <tr><td>App Multiply page</td><td>${v.confirmed===true?'confirmed ✓ <span class="tag r">R</span>':v.confirmed===false?'not offered (404) <span class="tag na">NA</span>':'not individually checked <span class="tag na">NA</span>'}</td></tr>
+      ${v.tvl!=null?`<tr><td>Collateral TVL</td><td>$${(v.tvl/1e6).toFixed(2)}M <span class="tag r">R</span></td></tr>`:''}
     </tbody></table></div>
   </section>`;
 }
-function renderTeardowns(){
-  const openIds=[...document.querySelectorAll("#teardowns details[open]")].map(d=>d.dataset.id);
-  document.getElementById("teardowns").innerHTML=ORDER.map(id=>{
-    const v=V[id];
-    const flipped=v.live&&((v.maxLev>=0)!==SNAPSIGN.tear[id]);
-    return `<details class="tdcard" data-id="${id}" ${openIds.includes(String(id))?'open':''}>
-      <summary>
-        <span class="tdsum-name">${v.pair}</span>
-        <span class="tdsum-driver">${v.driver}</span>
-        <span class="tdsum-right">
-          ${flipped?'<span class="flip">flipped vs 07-15</span>':''}
-          ${v.vol?'<span class="volbadge">⇅ volatile</span>':''}
-          ${v.confirmed?'':'<span class="unvchip">unverified</span>'}
-          <span class="verdict ${v.verdict}">${v.verdict==='red'?'RED':'GREEN'}</span>
-          <span class="tdsum-apy ${v.maxLev>=0?'pos':'neg'}">${f(v.maxLev,true)}</span>
-          <span class="caret">▼</span>
-        </span>
-      </summary>
-      <div class="tdbody">${tdHTML(id)}</div>
-    </details>`;
-  }).join("");
+/* "One vault per engine" — the pedagogical job the old Teardowns section did, now derived
+   from live data instead of a fixed list of four ids, and pointing INTO the board so there is
+   only one place a teardown lives. Picks the largest-TVL live example of each engine. */
+function renderEngineExamples(){
+  const el=document.getElementById("engex"); if(!el) return;
+  if(SRC.fluid.state!=="live"||!LB.all){ el.innerHTML=""; return; }
+  const picks=["Native yield","Swap fees","Base carry","Incentive"].map(src=>{
+    const r=LB.all.filter(x=>x.src===src&&DEC[x.id]).sort((a,b)=>b.col-a.col)[0];
+    return r?{src,r}:null;
+  }).filter(Boolean);
+  if(!picks.length){ el.innerHTML=""; return; }
+  el.innerHTML=`<span class="engex-lbl">See one of each, torn down:</span>`+picks.map(({src,r})=>
+    `<button type="button" class="engex-btn" data-open="${r.id}">
+      <span class="chip ${ENGCLS[src]||'base'}">${src}</span>
+      <span class="engex-pair">${r.pair}</span>
+      <span class="engex-apy ${r.lev>=0?'pos':'neg'}">${f(r.lev,true)}</span>
+    </button>`).join("");
 }
+/* open the named vault's row in the board and scroll to it */
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-open]"); if(!b) return;
+  const id=+b.dataset.open;
+  if(!boardOpen.has(id)) boardOpen.add(id);
+  renderBoard();
+  const row=document.querySelector(`tr[data-row="${id}"]`);
+  if(row){ row.scrollIntoView({block:"center"}); row.focus(); }
+});
 
 /* --- method & caveats card (provenance, legend, formulas) --- */
 function renderMethod(){
   document.getElementById("methodcard").innerHTML=`
-  <div><b>Reliability labels.</b> <span class="tag r">R</span> read from source (Fluid/Merkl live at last refresh; Aave rows snapshot-dated) · <span class="tag d">D</span> derived, arithmetic shown, recomputed from raw on refresh · <span class="tag na">NA</span> not exposed / not confirmable.</div>
-  <div><b>Sources.</b> Fluid vaults API <span class="mono">api.fluid.instadapp.io/v2/1/vaults</span> (per-token rates, stakingApr, rewards, reserves→weights). Method reconciled 3/3 against Fluid's own vault pages on 2026-07-15; Net APR / Max Leverage APY confirmed per vault at <span class="mono">fluid.io/vaults/1/{id}/strategies/multiply</span>. Prices at snapshot: ETH $1,919.57, wstETH $2,379.11. Base lending/staking rates drift only a basis point or two intraday, but swap-fee-driven APYs move far more — marked ⇅; WBTC-cbBTC, USDC-ETH and reUSD-USDT each swung materially within the snapshot day.</div>
+  <div><b>Reliability labels.</b> <span class="tag r">R</span> read from source (Fluid, Merkl and Aave, live at the last refresh — the freshness bar at the top says which of the four actually landed) · <span class="tag d">D</span> derived, arithmetic shown, recomputed from raw on refresh · <span class="tag na">NA</span> not exposed / not confirmable. Anything that could not be fetched keeps its last good value and is marked STALE, or falls back to the ${SNAPDATE} snapshot and says so — no number is repainted as live when it is not.</div>
+  <div><b>Sources.</b> Fluid vaults API <span class="mono">api.fluid.instadapp.io/v2/1/vaults</span> (per-token rates, stakingApr, rewards, reserves→weights). Method reconciled 3/3 against Fluid's own vault pages on 2026-07-15; Net APR / Max Leverage APY confirmed per vault at <span class="mono">fluid.io/vaults/1/{id}/strategies/multiply</span>. Token prices come from the same payload and are used for the USD valuation. Base lending/staking rates drift only a basis point or two intraday, but swap-fee-driven APYs move far more — marked ⇅; WBTC-cbBTC, USDC-ETH and reUSD-USDT each swung materially within the snapshot day.</div>
   <div><b>Method.</b> Each side is weighted by its OWN token mix (mirrored on self-loops); engine signs per the legend above. Loop: Supply·L − Borrow·(L−1), L = 1/(1−CF). USD valuation via vault shares × per-share reserves × price. wstETH-debt study replaces the debt token's true ETH-terms cost (0.13% interest + 2.21% staking) with plain ETH (2.25% interest), holding leverage constant.</div>
-  <div><b>Aave v4 data.</b> Borrow costs + borrowable capacity read 2026-07-15 from <span class="mono">aave.tokenlogic.xyz/aave/v4</span> (per-spoke reserve tables), cross-referenced with pro.aave.com/insights — that source blocks browser fetches, so the hub board is a <b>static snapshot (manual refresh only)</b>. Merkl incentives from <span class="mono">api.merkl.xyz/v4/opportunities</span> — live: the incentive table, with-incentive projections and freshness banner rebuild from LIVE campaigns on refresh. Collateral yields are issuer-native and accrue off Aave's book — cited approximately and variable.</div>
-  <div><b>Live layer.</b> "Refresh from source" re-fetches raw inputs (Fluid per-token rates, stakingApr, rewards, per-share reserves, prices, positions, DEX share caps; Merkl LIVE campaign APRs + end dates; Ethereum block via public RPC) and recomputes every derived value in-page — nothing derived is repainted from storage. Engine classification: Incentive if rewards flip the sign; Native yield if collateral staking contribution beats fees; Swap fees (⇅) if the fee contribution ≥ max(1pp, 25% of |Max Lev APY|); else Base carry. Cap-fill = DEX totalShares/maxShares. Fee comparables for the §03 projection table are live v51 (BTC pair) and v44 (ETH pair) trading APRs. Verdict rules re-evaluate after each recompute; any sign that differs from the 2026-07-15 snapshot is flagged "flipped". On fetch failure the last good values are kept and the source is marked STALE. Merkl's CORS accepts file:// and https origins but rejects plain http://localhost, and rate-limits bursts (HTTP 429) — a STALE Merkl flag usually clears on the next refresh. Figures are gross of impermanent loss, entry slippage and liquidation; nothing here is financial advice.</div>`;
+  <div><b>Aave v4 data — now live.</b> Hub rates, borrowable depth, collateral factors and frozen/borrowable flags come from Aave's own public GraphQL API, <span class="mono">api.aave.com/graphql</span> — no key, CORS-open, and the same backend app.aave.com reads. Three queries per refresh: <span class="mono">hubs</span> (the four Ethereum hubs), <span class="mono">hubAssets</span> per hub (borrow APY, utilization, available liquidity in USD) and <span class="mono">reserves</span> (per-spoke collateral factor, borrowable/collateral flags, frozen status). Rates arrive as decimal fractions and are scaled ×100 here. This replaces the hand-scraped tokenlogic/pro.aave snapshot the page previously carried${ABORROW["Core|USDT"]?` — those numbers had drifted materially (Core USDT borrow was 3.98% at the ${SNAPDATE} scrape, and reads ${ABORROW["Core|USDT"].apy.toFixed(2)}% right now)`:" (live comparison pending — the Aave fetch has not landed this session)"}. <b>Collateral factor is spoke-scoped, not hub-wide</b> — the same asset carries different CFs on different spokes. Cross-checked independently against direct <span class="mono">eth_call</span> reads of the hub contracts, which agreed to the basis point. Merkl incentives from <span class="mono">api.merkl.xyz/v4/opportunities</span> (status=LIVE) are likewise live. Collateral yields on the supply legs remain issuer-native external estimates — they accrue off Aave's book, and are labelled as approximate and variable.</div>
+  <div><b>Live layer.</b> "Refresh from source" re-fetches raw inputs (Fluid per-token rates, stakingApr, rewards, per-share reserves, prices, positions, DEX share caps; Merkl LIVE campaign APRs + end dates; Aave v4 hub rates, depth and collateral factors; Ethereum block via public RPC) and recomputes every derived value in-page — nothing derived is repainted from storage. <b>Engine classification</b> describes whichever term dominates the decomposition, independent of the sign of the result: Incentive if rewards flip the sign or are worth ≥ max(2pp, 50% of |Max Lev APY|); Native yield if the collateral staking contribution beats fees; Swap fees (⇅) if the fee contribution ≥ max(1pp, 25% of |Max Lev APY|); else Base carry. A red vault can therefore be labelled "Native yield" or "Swap fees" — the label names the driver, the colour and the number carry the sign. <b>Cap-fill</b> = DEX totalShares/maxShares, and is "—" on a side with no DEX pool rather than 0%. Fee comparables for the §03 projection table are the live v51 (BTC pair) and v44 (ETH pair) trading APRs, applied per side. Verdict rules re-evaluate after each recompute; any sign that differs from the ${SNAPDATE} snapshot is flagged "flipped". On fetch failure the last good values are kept and the source is marked STALE. Merkl's CORS accepts file:// and https origins but rejects plain <span class="mono">http://localhost</span>, and rate-limits bursts (HTTP 429) — a STALE Merkl flag usually clears on the next refresh, and one deferred retry fires automatically. Figures are gross of impermanent loss, entry slippage and liquidation; nothing here is financial advice.</div>`;
 }
 
 /* --- GHO-pattern chip: scroll to the canonical box --- */
@@ -1528,16 +2211,8 @@ document.addEventListener("click",e=>{
   if(el) el.scrollIntoView({block:"center"});
 });
 
-/* --- theme toggle (viewer default = dark) --- */
-(function(){
-  const saved=localStorage.getItem("le-theme");
-  if(saved==="light") document.documentElement.dataset.theme="light";
-  document.getElementById("themebtn").addEventListener("click",()=>{
-    const light=document.documentElement.dataset.theme==="light";
-    if(light){ delete document.documentElement.dataset.theme; localStorage.setItem("le-theme","dark"); }
-    else { document.documentElement.dataset.theme="light"; localStorage.setItem("le-theme","light"); }
-  });
-})();
+/* --- theme: bootstrap is the blocking script in <head>; the toggle handler is
+       delegated from nav.js so all three dashboards share one implementation. --- */
 
 /* --- full render pipeline (called at boot and after every refresh) --- */
 function rerender(){
@@ -1545,16 +2220,17 @@ function rerender(){
   const openWhy=[...document.querySelectorAll("#teardowns details.why[open]")].map(keyOf);
   const studyOpen=document.getElementById("studycard").open;
   renderKPIs();
+  renderMethod();      /* the method card quotes live figures, so it re-renders too */
   renderFindings();
+  renderEngineExamples();
   renderBoard();
-  renderTeardowns();
   document.getElementById("spoke").innerHTML="";
   buildSpoke();
   buildStudy();
   document.getElementById("studycard").open=studyOpen;
-  const R=LB.rates;
-  const dl=Math.min(...LB.wst.map(w=>w.delta)).toFixed(1), dh=Math.max(...LB.wst.map(w=>w.delta)).toFixed(1);
-  document.getElementById("lstsum").textContent=`~+${dl} to +${dh}% at max leverage`;
+  /* buildStudy() publishes the signed range it actually rendered; re-deriving it here is
+     how the summary line and the card body drifted apart (and printed "+-0.2%"). */
+  document.getElementById("lstsum").textContent=`~${LB.study.rng} at max leverage`;
   document.querySelectorAll("#teardowns details.why")
     .forEach(d=>{ if(openWhy.includes(keyOf(d))) d.open=true; });
 }
