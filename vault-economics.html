@@ -1227,7 +1227,7 @@ function buildSpoke(){
     const lend=e.lend, total=e.lend+e.native+e.fees+e.inc;
     const steps=[
       {k:"native",lbl:"collateral staking / funding",       v:e.native,cls:"native",tag:""},
-      {k:"fees",  lbl:e.feeSrc?`from live pools — ${e.feeSrc}`:"swap fees", v:e.fees, cls:"fees", tag:'<span class="tag d" style="margin-left:5px">D</span>'},
+      {k:"fees",  lbl:e.feeSrc?`90-day avg — ${e.feeSrc}`:"swap fees, 90-day avg", v:e.fees, cls:"fees", tag:'<span class="tag d" style="margin-left:5px">90d</span>'},
       {k:"inc",   lbl:"Merkl campaign, while it runs",       v:e.inc,   cls:"inc",   tag:'<span class="lq temp" style="margin-left:5px">temp</span>'},
     ].filter(x=>Math.abs(x.v)>=0.005);
     const nm={base:"Base carry",native:"Native yield",fees:"Swap fees",inc:"Incentive"};
@@ -1364,7 +1364,7 @@ function buildSpoke(){
     <div class="tbl-wrap"><table class="audit"><thead><tr><th>Vault</th><th>Supply 1×</th><th>Borrow 1×</th><th>10× base</th><th>~w/ fees <span class="tag d">D</span></th><th>w/ incentive</th><th>$/yr @$10M · base</th><th>note</th></tr></thead><tbody>${projRows}</tbody></table></div>
     <div class="call" style="margin-top:14px">
       <h4>How to read it</h4>
-      <p>Max APY = <span class="mono">Supply × ${PROJ_L} − Borrow × ${PROJ_L-1}</span> — the loop identity, validated against Fluid's own pages. Read the <b>10× base</b> column for what each structure pays unsubsidised, and the <b>w/ incentive</b> column for what the current campaigns add on top <button class="ghochip" data-goto="gho-pattern">GHO pattern ↗</button>. The fee column <span class="tag d">D</span> reads each leg's swap fee from <b>its own live Fluid pool</b> — the collateral pool ×${PROJ_L}, a pool debt ×${PROJ_L-1}, a single-token debt earns none. It is the trading APR of the pool that actually holds those two tokens, not a family-wide proxy: LBTC-cbBTC's collateral pool earns ${POOLFEE["LBTC|cbBTC"]?(POOLFEE["LBTC|cbBTC"].tr).toFixed(2):"0.00"}% while the WBTC-cbBTC debt pool earns ${POOLFEE["WBTC|cbBTC"]?(POOLFEE["WBTC|cbBTC"].tr).toFixed(2):"0.36"}%, so they are counted separately. Where a leg's pool does not exist live (a collateral pool that has not been created yet), the fee is shown as <b>n/a</b> rather than borrowed from an unrelated pool. <b>Both loan legs are read live from the Aave API</b>; supply legs add the token's native yield from Fluid.</p>
+      <p>Max APY = <span class="mono">Supply × ${PROJ_L} − Borrow × ${PROJ_L-1}</span> — the loop identity, validated against Fluid's own pages. Read the <b>10× base</b> column for what each structure pays unsubsidised, and the <b>w/ incentive</b> column for what the current campaigns add on top <button class="ghochip" data-goto="gho-pattern">GHO pattern ↗</button>. The fee column reads each leg's swap fee from <b>its own pool</b> (collateral pool ×${PROJ_L}, a pool debt ×${PROJ_L-1}, single-token debt earns none) — the pool that actually holds those two tokens, not a family-wide proxy. It is anchored to the pool's <b>90-day average <span class="tag d">90d</span></b> — 90 days of swap volume from Dune's <span class="mono">dex.trades</span> ÷ live pool TVL — rather than a single moment's reading, which is as noisy as one day's volume (as of ${FEE90_DATE}; regenerated periodically). The engine breakdown on each card also shows the <b>live 7-day</b> when it runs materially hot or cold against that baseline. Where a leg's pool does not exist yet, the fee is <b>n/a</b>, not borrowed from an unrelated pool. <b>Both loan legs are read live from the Aave API</b>; supply legs add the token's native yield from Fluid.</p>
       <p style="color:var(--faint);font-size:12px"><b>Estimate <span class="tag d">D</span>.</b> Native yields are external, approximate and <b>variable</b> (sUSDe shown at ~6% has ranged ~4-25%; weETH ~2.9%, wstETH ~2.2%, LBTC ~1.5% + unpriced points). $/yr = base 10× carry on $10M, indicative only. See Method &amp; caveats for what these figures are gross of.</p>
     </div>
   </section>
@@ -1565,14 +1565,44 @@ function supplyLeg(hub,toks){
 }
 
 /* mean live borrow APY across a structure's debt tokens; null if any leg is missing */
-/* live trading APR for the DEX pool that trades this exact token pair, or null if none exists.
-   A single-token leg has no pool and earns no swap fee (returns {tr:0}). */
+/* Swap-fee reading for the DEX pool that trades this token pair. The PRIMARY number (`tr`) is
+   the 90-day average — the trusted baseline — with the live 7-day (`tr7`) and the instantaneous
+   (`trInst`) carried alongside for context. Null if the pair has no pool at all; {tr:0,single}
+   for a single-token leg. */
 function poolFee(toks){
   if(!toks) return null;
   const ts=toks.map(t=>t==="ETH"?"WETH":t);
   if(ts.length<2) return {tr:0, single:true};
-  const p=POOLFEE[ts.slice().sort().join("|")];
-  return p?{tr:p.tr, id:p.id, pair:p.pair}:null;
+  const key=ts.slice().sort().join("|");
+  const inst=POOLFEE[key], f90=FEE90[key], f7=FEE7[key];
+  if(f90==null && !inst) return null;                    // no data for this pair
+  return {
+    tr: (f90!=null?f90:(inst?inst.tr:0)),                // 90-day average, falling back to live
+    tr90:(f90!=null?f90:null), tr7:(f7!=null?f7:null), trInst:(inst?inst.tr:null),
+    pair:key, id:inst?inst.id:null
+  };
+}
+
+/* fetch DefiLlama's fluid-dex pools ONCE per visit and derive a live 7-day swap-fee APR per pair
+   (7d volume ÷ TVL × the pool's fee tier). ~2MB, so it is fetched in the background after the
+   main render and never re-fetched on manual refresh — the 7-day window is stable intra-session. */
+async function fetchFee7(){
+  if(fee7Loaded) return;
+  try{
+    /* FEE_CFG keys are mixed-case-sorted (WBTC|cbBTC); DefiLlama symbols are upper-case and
+       sort differently (CBBTC|WBTC). Match on an uppercase-sorted, ETH→WETH canonical form. */
+    const up=k=>k.split("|").map(s=>s.toUpperCase()==="ETH"?"WETH":s.toUpperCase()).sort().join("|");
+    const UP2KEY={}; for(const k of Object.keys(FEE_CFG)) UP2KEY[up(k)]=k;
+    const j=await(await fetch("https://yields.llama.fi/pools")).json();
+    for(const p of (j.data||[])){
+      if(p.project!=="fluid-dex"||p.chain!=="Ethereum") continue;
+      const cfgKey=UP2KEY[up(String(p.symbol||"").replace(/-/g,"|"))];
+      if(!cfgKey||!p.volumeUsd7d||!p.tvlUsd) continue;
+      const [fee,cut]=FEE_CFG[cfgKey];
+      FEE7[cfgKey]=+((p.volumeUsd7d/7)*fee*(1-cut)*365/p.tvlUsd*100).toFixed(3);
+    }
+    fee7Loaded=true;
+  }catch(e){ /* keep 90-day baseline; 7-day context just stays absent */ }
 }
 
 function borrowLeg(hub,toks){
@@ -1585,8 +1615,35 @@ function borrowLeg(hub,toks){
 const SNAPSIGN={tear:Object.fromEntries(ORDER.map(id=>[id,V[id].maxLev>=0])),ghoEx:LB.gho.lev>=0,projBase:PROJ.map(p=>!p.base.startsWith("−"))};
 /* Fluid comparable pool fees, kept per side (collateral earns, debt rebates) because the
    two are not equal in general — v77 currently reads 16.69 / 14.85. Refreshed from live v51/v44. */
-/* live DEX-pool trading APR by sorted token pair — "TOKA|TOKB" -> {tr, id, pair} */
+/* live INSTANTANEOUS DEX-pool trading APR by sorted token pair — "TOKA|TOKB" -> {tr, id, pair} */
 const POOLFEE={};
+
+/* 90-DAY AVERAGE swap-fee APR per pair (percent). The trusted baseline — a single moment's
+   trading APR is as noisy as one day's volume, so the swap-fee engine is anchored to the
+   90-day average instead. Computed offline: SUM(90d swap volume) from Dune's dex.trades
+   (project='fluid') ÷ live pool TVL × the pool's fee tier. Regenerate periodically. */
+const FEE90_DATE="2026-07-21";
+const FEE90={
+  "GHO|USDC":0.473,"GHO|sUSDe":1.613,"LBTC|WBTC":0.595,"PAXG|XAUt":0.601,"PST|USDC":0.028,
+  "USDC|USDT":0.813,"USDC|WETH":25.057,"USDC|syrupUSDC":2.694,"USDT|USDe":16.757,
+  "USDT|reUSD":0.593,"USDT|sUSDe":6.39,"USDe|USDtb":1.22,"WBTC|cbBTC":0.351,"WETH|ezETH":3.091,
+  "WETH|osETH":0.0,"WETH|rsETH":0.787,"WETH|weETH":1.096,"WETH|weETHs":0.292,"WETH|wstETH":0.248,
+  "cbBTC|eBTC":0.651
+};
+/* pool fee tier + revenue cut per pair — static config, for the live 7-day recompute below */
+const FEE_CFG={
+  "GHO|USDC":[0.0001,0.25],"GHO|sUSDe":[0.0001,0.25],"LBTC|WBTC":[0.0001,0.25],
+  "PAXG|XAUt":[0.0002,0.25],"PST|USDC":[0.0002,0.25],"USDC|USDT":[7e-06,0.25],
+  "USDC|WETH":[0.001,0.0],"USDC|syrupUSDC":[0.0005,0.25],"USDT|USDe":[0.0001,0.25],
+  "USDT|reUSD":[0.0002,0.25],"USDT|sUSDe":[0.0002,0.5],"USDe|USDtb":[0.0001,0.25],
+  "WBTC|cbBTC":[4.5e-05,0.25],"WETH|ezETH":[0.0005,0.25],"WETH|osETH":[0.0003,0.25],
+  "WETH|rsETH":[0.0007,0.25],"WETH|weETH":[0.000102,0.25],"WETH|weETHs":[0.0005,0.25],
+  "WETH|wstETH":[0.0002,0.25],"cbBTC|eBTC":[0.0005,0.25]
+};
+/* live 7-DAY swap-fee APR per pair, filled once per visit from DefiLlama's fluid-dex volume.
+   Shows whether the last week is running hot or cold against the 90-day baseline. */
+const FEE7={};
+let fee7Loaded=false;
 const LASTINC={usdg:6.20,frx:5.36,susde:3.75,weth:0.77}; // last known Merkl APRs (snapshot defaults)
 let FLIPS=[];
 let merklRetry=false;
@@ -1978,8 +2035,14 @@ function rebuildProj(){
     const cFee=poolFee(s.col), dFee=poolFee(s.debt);
     p.cFee=cFee; p.dFee=dFee;
     const feeKnown = !!(cFee && dFee);             // both legs resolved to a pool (or single-token)
-    const feePP = feeKnown ? (cFee.tr*L + dFee.tr*(L-1)) : null;
-    p.feePP=feePP;
+    /* primary = 90-day average; also carry the live 7-day and instantaneous for context */
+    const legF=(leg,pick)=>leg.single?0:pick(leg);
+    const combine=pick=>{ const c=legF(cFee,pick), d=legF(dFee,pick);
+      return (c==null||d==null)?null:(c*L + d*(L-1)); };
+    const feePP  = feeKnown ? combine(x=>x.tr)     : null;   // 90-day baseline
+    const feePP7 = feeKnown ? combine(x=>x.tr7)    : null;   // live 7-day (null until loaded)
+    const feePPi = feeKnown ? combine(x=>x.trInst) : null;   // instantaneous
+    p.feePP=feePP; p.feePP7=feePP7; p.feePPi=feePPi;
     p.fees=(feePP&&Math.abs(feePP)>=0.05)?"~"+sgn(base+feePP,0)+"%":(feeKnown?"—":"n/a");
     const incC=(s.incKey&&INC[s.incKey]!=null)?(s.side==="supply"?INC[s.incKey]*L:INC[s.incKey]*(L-1)):0;
     const inc=incC?base+incC:null;
@@ -1992,14 +2055,19 @@ function rebuildProj(){
     if(sl){
       const lendCol=sl.parts.reduce((a,x)=>a+x.lend,0)/sl.parts.length;
       const natCol =sl.parts.reduce((a,x)=>a+x.nat ,0)/sl.parts.length;
-      /* fee source label: name the actual pool(s) read, so a reader can see the 0% is real.
-         When no live pool exists for a leg, the swap-fee engine is omitted from the ladder. */
-      const feeSrc = feeKnown ? [
-        cFee.tr?`${cFee.pair} pool ${(cFee.tr).toFixed(2)}%`:(cFee.single?null:`${s.col.join("-")} pool 0%`),
-        (dFee.single?null:(dFee.tr?`${dFee.pair} debt ${(dFee.tr).toFixed(2)}%`:`${s.debt.join("-")} debt 0%`)),
-      ].filter(Boolean).join(" · ") : null;
+      /* fee source: name each pool and its 90-day average, appending the live 7-day only when
+         it diverges materially — so a 0% is visibly real and a hot/cold week is flagged inline
+         in the same units (raw pool APR), without cluttering stable pools. */
+      const legLbl=(leg,role)=>{
+        if(leg.single) return null;
+        const hot=leg.tr7!=null && Math.abs(leg.tr7-leg.tr)>=0.2;
+        return `${leg.pair}${role} ${leg.tr.toFixed(2)}%`
+          + (hot?` <span style="color:var(--accent)">(7d ${leg.tr7.toFixed(2)}%)</span>`:"");
+      };
+      const feeSrc = feeKnown ? [legLbl(cFee,""), legLbl(dFee," debt")].filter(Boolean).join(" · ") : null;
       p.eng={ lend:lendCol*L-bor*(L-1), native:natCol*L,
-              fees:feePP||0, feeKnown, feeSrc, inc:incC, incTemp:!!incC };
+              fees:feePP||0, fees7:feePP7, feesInst:feePPi, feeKnown, feeSrc,
+              inc:incC, incTemp:!!incC };
     } else p.eng=null;
   });
 }
@@ -2119,6 +2187,9 @@ async function refresh(){
     if(sl) sl.innerHTML=`<span class="src"><span class="flip">render failed — figures below may be partial. Press Refresh.</span></span>`;
   }
   finally{ btn.disabled=false; btn.classList.remove("loading"); }
+  /* live 7-day swap-fee context — fetched once per visit, in the background (2MB), then the
+     projection re-renders so the "recent 7d" note appears without blocking the main render */
+  if(!fee7Loaded) fetchFee7().then(()=>{ if(fee7Loaded){ rebuildProj(); try{ buildSpoke(); }catch(e){} } });
 }
 
 
