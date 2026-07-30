@@ -123,6 +123,14 @@
   .prefill { font-family:var(--font-mono); font-size:10.5px; color:var(--accent); margin-top:4px; cursor:pointer;
     background:none; border:none; padding:0; text-align:left; }
   .prefill:hover { text-decoration:underline; }
+  .marketnote { font-size:11.5px; color:var(--text-mute); margin-top:9px; line-height:1.5; }
+  .marketnote b { color:var(--text-dim); }
+  .tokmeta { font-family:var(--font-mono); font-size:10.5px; color:var(--text-mute);
+    display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin:-3px 0 2px 2px; }
+  .tokmeta .aave { color:var(--primary-hov); }
+  .tokmeta input { width:62px; padding:2px 5px; font-size:10.5px; text-align:right; }
+  .tokmeta .src { color:var(--slate); }
+  .tokmeta .miss { color:var(--accent); }
   .result { position:sticky; top:14px; }
   .bigapr { text-align:center; padding:6px 0 12px; }
   .bigapr .v { font-family:var(--font-mono); font-size:44px; font-weight:700; letter-spacing:-1.5px;
@@ -181,7 +189,7 @@
   <div class="topbar">
     <div class="brand">
       <h1>Custom Loop Builder</h1>
-      <div class="sub">Price any collateral / debt combination at Aave v4 rates &mdash; live</div>
+      <div class="sub">Price any collateral / debt combination at live Aave v4 rates</div>
     </div>
     <div class="right">
       <button class="btn ghost" id="themebtn" type="button" aria-label="Toggle light/dark theme">◐</button>
@@ -191,18 +199,33 @@
   </div>
 
   <div class="sources-bar">
-    <div class="srcline" id="srcline"><span class="src"><span class="sdot wait"></span>loading Aave v4 + Fluid…</span></div>
+    <div class="srcline" id="srcline"><span class="src"><span class="sdot wait"></span>loading Aave v4…</span></div>
   </div>
 
   <div class="shell">
     <section class="block">
       <div class="block-head">
         <h2>Build a loop</h2>
-        <span class="note">every rate below is read live &mdash; you supply the structure, the swap fee and the number of loops</span>
+        <span class="note">Aave v4 supplies every rate and collateral factor &mdash; you supply the structure, the swap fee and the number of loops</span>
       </div>
 
       <div class="builder">
         <div>
+          <div class="panel">
+            <h3>Market <span class="hint">rates differ a lot between hubs &mdash; GHO borrows at 2.6% on one and 7.3% on another</span></h3>
+            <div class="fld" style="grid-template-columns:1fr 1fr;margin-top:0">
+              <div>
+                <label style="font-size:12.5px;color:var(--text-mute)"><b style="color:var(--text-dim)">Chain</b></label>
+                <select id="chain" style="margin-top:5px"></select>
+              </div>
+              <div>
+                <label style="font-size:12.5px;color:var(--text-mute)"><b style="color:var(--text-dim)">Hub / spoke</b></label>
+                <select id="spoke" style="margin-top:5px"></select>
+              </div>
+            </div>
+            <div id="market-note" class="marketnote"></div>
+          </div>
+
           <div class="panel">
             <h3>Collateral — what you deposit <span class="hint" id="col-hint"></span></h3>
             <div class="leg" id="col-leg"></div>
@@ -287,33 +310,38 @@
 </div>
 
 <div class="footer">
-  <span>Rates from <a href="https://api.aave.com/graphql" target="_blank" rel="noopener">Aave v4 API</a> &middot; native yields from <a href="https://api.fluid.instadapp.io/" target="_blank" rel="noopener">Fluid</a> &middot; not affiliated with Aave &middot; nothing here is financial advice</span>
+  <span><b>All rates, collateral factors and borrowable flags: <a href="https://api.aave.com/graphql" target="_blank" rel="noopener">Aave v4</a>.</b>
+    Token native yields seeded from <a href="https://api.fluid.instadapp.io/" target="_blank" rel="noopener">Fluid</a> and editable &middot;
+    not affiliated with Aave &middot; nothing here is financial advice</span>
   <span><a href="./">All dashboards</a> · <a href="vault-economics.html">Loop Economics</a></span>
 </div>
 <script>
 /* ============================================================================
-   CUSTOM LOOP BUILDER — pick the legs, set the fee and the loop count, get the APR.
-   Same maths the Loop Economics page validates against Fluid's own vault pages,
-   driven by your inputs instead of a fixed structure list.
+   CUSTOM LOOP BUILDER
+   Every rate, collateral factor and borrowable flag comes from Aave v4 — this
+   prices Aave, nothing else. Fluid is used for ONE thing only: a starting value
+   for each token's NATIVE yield (staking / funding), which Aave does not publish
+   because it accrues in the token's own exchange rate, off Aave's book. Every
+   one of those is editable, and labelled where it came from.
    ============================================================================ */
 
 const AAVE_URL="https://api.aave.com/graphql";
 const FLUID_URL="https://api.fluid.instadapp.io/v2/1/vaults";
+const CHAINS=[{id:1,name:"Ethereum"},{id:43114,name:"Avalanche"}];   /* the only chains Aave v4 is on */
 
-/* This API REJECTS an unused variable declaration, so a query that reads no fiat
-   field must not declare $currency. */
-const Q_HUBS=`{ hubs(request:{query:{chainIds:[1]}}) { id name } }`;
+/* This API rejects an unused variable declaration, so a query reading no fiat field
+   must not declare $currency. */
+const Q_HUBS=`query($c:[ChainId!]!){ hubs(request:{query:{chainIds:$c}}) { id name chain { chainId name } } }`;
 const Q_ASSETS=`query($h: ID!){ hubAssets(request:{query:{hubId:$h}}) {
   underlying { info { symbol } }
   summary { supplyApy { value } borrowApy { value } utilizationRate { value } } } }`;
-const Q_RESERVES=`{ reserves(request:{query:{chainIds:[1]}}) {
+const Q_RESERVES=`query($c:[ChainId!]!){ reserves(request:{query:{chainIds:$c}}) {
   spoke { name }
-  asset { underlying { info { symbol } } hub { name } }
+  asset { underlying { info { symbol } } hub { name chain { chainId name } } }
   settings { collateralFactor { value } borrowable collateral }
   status { frozen }
   canBorrow } }`;
 
-/* rates come back as decimal FRACTIONS in high-precision strings: 0.0387 = 3.87% */
 const pct=v=>v==null?null:parseFloat(v.value!=null?v.value:v)*100;
 const num=x=>x==null?0:parseFloat(x);
 const f=(x,s)=>((x<0?"−":s?"+":"")+Math.abs(x).toFixed(2)+"%");
@@ -321,7 +349,16 @@ const sgn=(x,dp)=>(x<0?"−":"+")+Math.abs(x).toFixed(dp);
 const $=id=>document.getElementById(id);
 
 const SRC={aave:{state:"wait",at:null},fluid:{state:"wait",at:null}};
-let SPOKES=[], RATES={}, NATIVE={}, POOLFEE={}, ALLCOL=[], ALLDEBT=[];
+let SPOKES=[];      /* [{chainId, chain, hub, spoke, key, coll:{sym:{cf}}, borrow:Set}] */
+let RATES={};       /* "chainId|Hub|SYM" -> {supplyApy, borrowApy, util} */
+let NATIVE={};      /* SYM -> native yield % (seeded from Fluid, Ethereum only) */
+const NAT_OVERRIDE={};  /* SYM -> user-entered native yield */
+/* Tokens with NO intrinsic yield by construction — plain wrappers and non-rebasing stables.
+   Without this list a confirmed 0% is indistinguishable from "we could not find a rate", and
+   the page nags about WETH exactly as loudly as about a genuine LST it has no data for. */
+const NO_NATIVE=new Set(["WETH","WBTC","cbBTC","USDC","USDT","USDt","GHO","USDG","frxUSD","RLUSD",
+  "EURC","USDe","XAUt","AAVE","LINK","WAVAX","BTC.b","WETH.e"]);
+let POOLFEE={};     /* "A|B" -> live Fluid pool trading APR % */
 
 async function gql(query,variables){
   const r=await fetch(AAVE_URL,{method:"POST",headers:{"Content-Type":"application/json"},
@@ -332,33 +369,37 @@ async function gql(query,variables){
 }
 
 async function loadAave(){
-  const {hubs}=await gql(Q_HUBS);
-  const [assetSets,reserves]=await Promise.all([
-    Promise.all(hubs.map(h=>gql(Q_ASSETS,{h:h.id}).then(d=>({hub:h.name,rows:d.hubAssets})))),
-    gql(Q_RESERVES).then(d=>d.reserves),
+  const ids=CHAINS.map(c=>c.id);
+  const [{hubs},reserves]=await Promise.all([
+    gql(Q_HUBS,{c:ids}),
+    gql(Q_RESERVES,{c:ids}).then(d=>d.reserves),
   ]);
+  const sets=await Promise.all(hubs.map(h=>gql(Q_ASSETS,{h:h.id})
+    .then(d=>({chainId:h.chain.chainId,hub:h.name,rows:d.hubAssets}))));
   RATES={};
-  for(const set of assetSets)
-    for(const a of set.rows) RATES[set.hub+"|"+a.underlying.info.symbol]={
+  for(const s of sets) for(const a of s.rows)
+    RATES[s.chainId+"|"+s.hub+"|"+a.underlying.info.symbol]={
       supplyApy:pct(a.summary.supplyApy)||0,
       borrowApy:pct(a.summary.borrowApy)||0,
       util:pct(a.summary.utilizationRate)||0 };
-  /* A loop lives inside ONE SPOKE: the spoke sets the collateral factor AND decides what is
-     borrowable against it. Grouping by hub alone would silently pair a 95.5% Lido CF with a
-     borrow that spoke does not actually offer. */
   const byspoke={};
   for(const r of reserves){
     const hub=r.asset.hub.name, sp=r.spoke.name, sym=r.asset.underlying.info.symbol;
-    const key=hub+" / "+sp;
-    const e=byspoke[key]||(byspoke[key]={hub,spoke:sp,coll:{},borrow:new Set()});
+    /* chainId comes straight from the API. It must NOT be inferred: both chains run a hub
+       named "Core" with spokes named "Forex" and "Main" over overlapping symbols, so any
+       guess collides them — an earlier version lost USDC and EURC from Ethereum's Forex. */
+    const ch=(r.asset.hub.chain)||{};
+    const chainId=ch.chainId;
+    if(chainId==null) continue;
+    const chain=ch.name||(CHAINS.find(c=>c.id===chainId)||{}).name||String(chainId);
+    const key=chainId+"|"+hub+"|"+sp;
+    const e=byspoke[key]||(byspoke[key]={chainId,chain,hub,spoke:sp,key,coll:{},borrow:new Set()});
     if(r.status.frozen) continue;
     if(r.settings.borrowable&&r.canBorrow) e.borrow.add(sym);
     const cf=parseFloat((r.settings.collateralFactor||{}).value||0)*100;
     if(r.settings.collateral&&cf>0) e.coll[sym]={cf};
   }
   SPOKES=Object.values(byspoke).filter(s=>Object.keys(s.coll).length||s.borrow.size);
-  ALLCOL =[...new Set(SPOKES.flatMap(s=>Object.keys(s.coll)))].sort();
-  ALLDEBT=[...new Set(SPOKES.flatMap(s=>[...s.borrow]))].sort();
 }
 
 async function loadFluid(){
@@ -381,34 +422,100 @@ async function loadFluid(){
   }
 }
 
-const state={ col:[{sym:null,w:100}], debt:[{sym:null,w:100}], colFee:0, debtFee:0,
-              loops:10, cf:null, cfAuto:true, supInc:0, borInc:0 };
+/* native yield for a symbol: user override wins, then Fluid, else unknown (null) */
+function nat(sym){
+  if(sym in NAT_OVERRIDE) return NAT_OVERRIDE[sym];
+  if(sym in NATIVE) return NATIVE[sym];
+  return NO_NATIVE.has(sym) ? 0 : null;      // 0 = confirmed none; null = genuinely unknown
+}
+function natSource(sym){
+  if(sym in NAT_OVERRIDE) return "yours";
+  if(sym in NATIVE) return "Fluid";
+  return NO_NATIVE.has(sym) ? "zero" : "none";
+}
+
+const state={ chainId:1, spokeKey:"auto",
+              col:[{sym:null,w:100}], debt:[{sym:null,w:100}],
+              colFee:0, debtFee:0, loops:10, cf:null, cfAuto:true, supInc:0, borInc:0 };
+
+/* spokes on the selected chain */
+function chainSpokes(){ return SPOKES.filter(s=>s.chainId===state.chainId); }
+/* the spoke the user pinned, or null when on auto */
+function pinned(){ return state.spokeKey==="auto"?null:SPOKES.find(s=>s.key===state.spokeKey)||null; }
+/* token menus: constrained to the pinned spoke, else anything on the chain */
+function colList(){ const p=pinned();
+  return p?Object.keys(p.coll).sort():[...new Set(chainSpokes().flatMap(s=>Object.keys(s.coll)))].sort(); }
+function debtList(){ const p=pinned();
+  return p?[...p.borrow].sort():[...new Set(chainSpokes().flatMap(s=>[...s.borrow]))].sort(); }
+
+function renderMarket(){
+  $("chain").innerHTML=CHAINS.map(c=>`<option value="${c.id}"${c.id===state.chainId?" selected":""}>${c.name}</option>`).join("");
+  const list=chainSpokes().filter(s=>Object.keys(s.coll).length&&s.borrow.size)
+    .sort((a,b)=>(a.hub+a.spoke).localeCompare(b.hub+b.spoke));
+  $("spoke").innerHTML=`<option value="auto"${state.spokeKey==="auto"?" selected":""}>Auto — pick the best spoke for me</option>`
+    +list.map(s=>{
+      const n=Object.keys(s.coll).length, b=s.borrow.size;
+      return `<option value="${s.key}"${s.key===state.spokeKey?" selected":""}>${s.hub} / ${s.spoke} — ${n} collateral, ${b} borrowable</option>`;
+    }).join("");
+  const p=pinned();
+  $("market-note").innerHTML = p
+    ? `Pinned to <b>${p.hub} / ${p.spoke}</b>. Token menus below show only what this spoke actually accepts, and the collateral
+       factor comes from it. A loop must live inside one spoke — the spoke sets the CF <i>and</i> decides what is borrowable against it.`
+    : `On <b>auto</b>, pick any tokens and the builder finds the spoke that supports the combination, preferring the highest
+       collateral factor. Rates differ sharply between hubs — the same token can borrow at 2.6% in one and 7.3% in another.`;
+}
 
 function tokenOptions(list,selected){
   return `<option value="">— choose a token —</option>`+list.map(s=>
     `<option value="${s}"${s===selected?" selected":""}>${s}</option>`).join("");
 }
 
+/* per-token line showing exactly which number is Aave's and which is not */
+function tokMeta(leg,sym,hub){
+  if(!sym) return "";
+  const r=hub?RATES[state.chainId+"|"+hub+"|"+sym]:null;
+  const aaveTxt = r ? `<span class="aave">Aave ${leg==="col"?"supply":"borrow"} ${(leg==="col"?r.supplyApy:r.borrowApy).toFixed(2)}%</span>`
+                    : `<span class="miss">no Aave rate on this hub</span>`;
+  const n=nat(sym), src=natSource(sym);
+  const natTxt = `+ native <input type="number" step="0.01" min="0" data-nat="${sym}" value="${n==null?"":n.toFixed(2)}" placeholder="?" aria-label="native yield for ${sym}">%
+    <span class="${src==="none"?"miss":"src"}">${src==="Fluid"?"from Fluid":src==="yours"?"yours":
+      src==="zero"?"none — plain token":"not published — enter it"}</span>`;
+  return `<div class="tokmeta">${aaveTxt} ${natTxt}</div>`;
+}
+
 function renderLegs(){
+  const p=pinned();
+  const hubFor=()=>{ const s=p||resolveSpoke(); return s?s.hub:null; };
+  const hub=hubFor();
   ["col","debt"].forEach(function(leg){
-    const arr=state[leg], list=leg==="col"?ALLCOL:ALLDEBT;
+    const arr=state[leg], list=leg==="col"?colList():debtList();
     $(leg+"-leg").innerHTML=arr.map((t,i)=>`
-      <div class="tokrow${arr.length<2?" single":""}">
-        <select data-leg="${leg}" data-i="${i}" aria-label="${leg} token ${i+1}">${tokenOptions(list,t.sym)}</select>
-        ${arr.length>1?`<input type="number" data-w="${leg}" data-i="${i}" min="1" max="99" step="1" value="${t.w}" aria-label="weight percent">`:``}
-        ${arr.length>1?`<button class="iconbtn" data-rm="${leg}" data-i="${i}" title="remove this token" aria-label="remove">×</button>`:`<span></span>`}
+      <div>
+        <div class="tokrow${arr.length<2?" single":""}">
+          <select data-leg="${leg}" data-i="${i}" aria-label="${leg} token ${i+1}">${tokenOptions(list,t.sym)}</select>
+          ${arr.length>1?`<input type="number" data-w="${leg}" data-i="${i}" min="1" max="99" step="1" value="${t.w}" aria-label="weight percent">`:``}
+          ${arr.length>1?`<button class="iconbtn" data-rm="${leg}" data-i="${i}" title="remove this token" aria-label="remove">×</button>`:`<span></span>`}
+        </div>
+        ${tokMeta(leg,t.sym,hub)}
       </div>`).join("");
     $(leg+"-add").hidden = arr.length>=2;
     $(leg+"-fee-wrap").hidden = arr.length<2;
   });
 }
 
-/* which live spoke supports this exact combination? */
+function supports(s,cols,debts){
+  return cols.every(c=>s.coll[c])&&debts.every(d=>s.borrow.has(d));
+}
 function resolveSpoke(){
   const cols=state.col.map(t=>t.sym).filter(Boolean);
   const debts=state.debt.map(t=>t.sym).filter(Boolean);
+  const p=pinned();
+  /* Honour the pin ONLY if that spoke genuinely supports the selection — otherwise the CF
+     lookup below would read a token the spoke does not list. Falling through to null makes
+     the page show its "not live as one position" explanation instead of crashing. */
+  if(p) return (cols.length&&debts.length&&supports(p,cols,debts))?p:null;
   if(!cols.length||!debts.length) return null;
-  const ok=SPOKES.filter(s=>cols.every(c=>s.coll[c])&&debts.every(d=>s.borrow.has(d)));
+  const ok=chainSpokes().filter(s=>supports(s,cols,debts));
   if(!ok.length) return null;
   const picked=state.col.filter(t=>t.sym);
   const tot=picked.reduce((a,t)=>a+t.w,0)||1;
@@ -416,13 +523,18 @@ function resolveSpoke(){
   return ok.sort((a,b)=>score(b)-score(a))[0];
 }
 
-/* explain WHY a combination is not live, leg by leg */
 function diagnose(){
   const cols=state.col.map(t=>t.sym).filter(Boolean);
   const debts=state.debt.map(t=>t.sym).filter(Boolean);
-  const out=[];
-  cols.forEach(c=>{ if(!SPOKES.some(s=>s.coll[c])) out.push(`<b>${c}</b> is not collateral-enabled on any live spoke`); });
-  debts.forEach(d=>{ if(!SPOKES.some(s=>s.borrow.has(d))) out.push(`<b>${d}</b> is not borrowable on any live spoke`); });
+  const p=pinned();
+  if(p&&cols.length&&debts.length&&!supports(p,cols,debts)){
+    const bad=cols.filter(c=>!p.coll[c]).map(c=>`<b>${c}</b> is not collateral there`)
+      .concat(debts.filter(d=>!p.borrow.has(d)).map(d=>`<b>${d}</b> is not borrowable there`));
+    return [`you pinned <b>${p.hub} / ${p.spoke}</b>, but ${bad.join(" and ")} — switch the market to Auto to find a spoke that fits`];
+  }
+  const cs=chainSpokes(), out=[];
+  cols.forEach(c=>{ if(!cs.some(s=>s.coll[c])) out.push(`<b>${c}</b> is not collateral-enabled on any spoke of this chain`); });
+  debts.forEach(d=>{ if(!cs.some(s=>s.borrow.has(d))) out.push(`<b>${d}</b> is not borrowable on any spoke of this chain`); });
   if(out.length) return out;
   return [`no single spoke offers <b>${cols.join(" + ")}</b> as collateral <i>and</i> lets you borrow <b>${debts.join(" + ")}</b> against it`];
 }
@@ -436,8 +548,11 @@ function weights(arr){
    n loops of (deposit -> borrow CF -> swap back -> redeposit) leaves you holding
        C = 1 + CF + CF^2 + ... + CF^n = (1 - CF^(n+1)) / (1 - CF)
    units of collateral per unit of your own money, and D = C - 1 of debt.
-   C approaches 1/(1-CF) as n grows — the "max leverage" the other page quotes.
-   Net APR on YOUR money = S*C - B*D.                                            */
+   Net APR on YOUR money = S*C - B*D.
+
+   Native yield counts on BOTH sides. On the collateral it is income; on the debt it
+   is a COST — borrowing a token that appreciates means the debt grows with it, which
+   is why borrowing wstETH costs its borrow rate plus its ~2.2% staking.              */
 function compute(){
   const spoke=resolveSpoke();
   const cw=weights(state.col), dw=weights(state.debt);
@@ -446,27 +561,29 @@ function compute(){
   if(!cols.length||!debts.length) return {ready:false,spoke:spoke,diag:[]};
 
   const hub=spoke?spoke.hub:null;
-  const missing=[];
+  const missing=[], noNat=[];
   const rate=function(sym){
-    if(hub&&RATES[hub+"|"+sym]) return RATES[hub+"|"+sym];
-    const all=Object.keys(RATES).filter(k=>k.endsWith("|"+sym)).map(k=>RATES[k]);
+    if(hub&&RATES[state.chainId+"|"+hub+"|"+sym]) return RATES[state.chainId+"|"+hub+"|"+sym];
+    const pre=state.chainId+"|";
+    const all=Object.keys(RATES).filter(k=>k.startsWith(pre)&&k.endsWith("|"+sym)).map(k=>RATES[k]);
     if(!all.length){ missing.push(sym); return null; }
     return all[0];
   };
+  const natOf=function(sym){ const n=nat(sym); if(n==null){ noNat.push(sym); return 0; } return n; };
+  /* NO_NATIVE members never reach noNat — their 0% is a stated fact, not a missing lookup */
+
   const colLend=cols.reduce((a,t)=>{const r=rate(t.sym); return a+(r?r.supplyApy:0)*t.w;},0);
-  const colNat =cols.reduce((a,t)=>a+(NATIVE[t.sym]||0)*t.w,0);
+  const colNat =cols.reduce((a,t)=>a+natOf(t.sym)*t.w,0);
   const debtBor=debts.reduce((a,t)=>{const r=rate(t.sym); return a+(r?r.borrowApy:0)*t.w;},0);
+  const debtNat=debts.reduce((a,t)=>a+natOf(t.sym)*t.w,0);
 
   const colFee =state.col.length>1?(+state.colFee||0):0;
   const debtFee=state.debt.length>1?(+state.debtFee||0):0;
   const supInc=+state.supInc||0, borInc=+state.borInc||0;
 
-  /* Effective collateral factor, weighted across the basket. With a resolved spoke this is
-     that spoke's own CF. Without one the structure is hypothetical, so fall back to the best
-     CF each token reaches on any live spoke — otherwise a what-if collapses to 1x and cannot
-     be modelled at all. Either way the box stays editable. */
-  const bestCF=sym=>SPOKES.reduce((m,s)=>s.coll[sym]&&s.coll[sym].cf>m?s.coll[sym].cf:m,0);
-  const cfAuto=spoke?cols.reduce((a,t)=>a+spoke.coll[t.sym].cf*t.w,0)
+  const bestCF=sym=>chainSpokes().reduce((m,s)=>s.coll[sym]&&s.coll[sym].cf>m?s.coll[sym].cf:m,0);
+  const cfOf=(s,sym)=>(s&&s.coll[sym]?s.coll[sym].cf:0);
+  const cfAuto=spoke?cols.reduce((a,t)=>a+cfOf(spoke,t.sym)*t.w,0)
                     :(cols.every(t=>bestCF(t.sym)>0)?cols.reduce((a,t)=>a+bestCF(t.sym)*t.w,0):null);
   const cfIsHypo=!spoke&&cfAuto!=null;
   const cfPct=(state.cfAuto&&cfAuto!=null)?cfAuto:(+state.cf||0);
@@ -477,14 +594,17 @@ function compute(){
   const D=C-1;
 
   const S=colLend+colNat+colFee+supInc;
-  const B=debtBor-debtFee-borInc;
+  const B=debtBor+debtNat-debtFee-borInc;
   const apr=S*C-B*D;
 
-  /* four engines, each through the loop — they sum to apr exactly */
-  const eng={ lend:colLend*C-debtBor*D, native:colNat*C, fees:colFee*C+debtFee*D, inc:supInc*C+borInc*D };
+  /* four engines, each through the loop — they sum to apr exactly.
+     `native` nets the collateral's yield against what the debt token accrues. */
+  const eng={ lend:colLend*C-debtBor*D, native:colNat*C-debtNat*D,
+              fees:colFee*C+debtFee*D, inc:supInc*C+borInc*D };
 
-  return {ready:true, spoke:spoke, diag:spoke?[]:diagnose(), missing:[...new Set(missing)],
-          cols:cols, debts:debts, colLend:colLend, colNat:colNat, debtBor:debtBor,
+  return {ready:true, spoke:spoke, pinned:!!pinned(), diag:spoke?[]:diagnose(),
+          missing:[...new Set(missing)], noNat:[...new Set(noNat)],
+          cols:cols, debts:debts, colLend:colLend, colNat:colNat, debtBor:debtBor, debtNat:debtNat,
           cf:cfPct, cfAuto:cfAuto, cfIsHypo:cfIsHypo, n:n, C:C, D:D, S:S, B:B, apr:apr, eng:eng,
           maxC:1/(1-cf), ltv:C>0?D/C*100:0, unlev:S, spread:S-B,
           isPool:{col:state.col.length>1, debt:state.debt.length>1}};
@@ -496,7 +616,7 @@ function render(){
   if(r.ready&&state.cfAuto&&r.cfAuto!=null) $("cf").value=r.cfAuto.toFixed(1);
   $("cf-sub").textContent = state.cfAuto
     ? (r.spoke ? "auto — "+r.spoke.hub+" / "+r.spoke.spoke+" spoke"
-       : r.cfIsHypo ? "best CF each token reaches anywhere — hypothetical"
+       : r.cfIsHypo ? "best CF each token reaches on this chain — hypothetical"
        : "no published CF — set it yourself")
     : "manual override";
 
@@ -505,14 +625,13 @@ function render(){
     ? `${r.n} loop${r.n===1?"":"s"} → <b style="color:var(--text-dim)">${lev}</b> collateral${r.n>0?` · ceiling ${r.maxC.toFixed(2)}×`:""}`
     : "deposit → borrow → swap back → repeat";
 
-  /* live-pool hint for each swap-fee input */
   ["col","debt"].forEach(function(leg){
     const arr=state[leg], btn=$(leg+"-fee-prefill");
     const syms=arr.map(t=>t.sym).filter(Boolean);
     if(arr.length>1&&syms.length===2){
       const live=POOLFEE[syms.slice().sort().join("|")];
       btn.hidden=false;
-      if(live!=null){ btn.textContent=`↳ a live Fluid ${syms.join("-")} pool trades at ${live.toFixed(2)}% — use it`; btn.dataset.v=live.toFixed(2); }
+      if(live!=null){ btn.textContent=`↳ a live Fluid ${syms.join("-")} pool trades at ${live.toFixed(2)}% — use it as a starting point`; btn.dataset.v=live.toFixed(2); }
       else { btn.textContent=`↳ no live Fluid pool for ${syms.join("-")} — this fee is your estimate`; btn.dataset.v=""; }
     } else btn.hidden=true;
   });
@@ -538,30 +657,37 @@ function render(){
 
   const flags=[];
   if(r.spoke){
-    flags.push(`<div class="flag ok"><span>✓</span><div><b>Live today.</b> The ${r.spoke.hub} / ${r.spoke.spoke} spoke takes this
-      ${r.cols.length>1?"basket":"collateral"} at ${r.cfAuto.toFixed(1)}% collateral factor and lets you borrow
+    flags.push(`<div class="flag ok"><span>✓</span><div><b>Live today${r.pinned?"":" — auto-resolved"}.</b> The ${r.spoke.chain} ${r.spoke.hub} / ${r.spoke.spoke} spoke
+      takes this ${r.cols.length>1?"basket":"collateral"} at ${r.cfAuto.toFixed(1)}% collateral factor and lets you borrow
       ${r.debts.map(d=>d.sym).join(" + ")} against it.</div></div>`);
   } else {
     flags.push(`<div class="flag warn"><span>⚠</span><div><b>Not live as one position.</b> ${r.diag.join("; ")}.
-      The numbers below still price it at today's rates${r.cfIsHypo?`, using the best collateral factor each token reaches on any
-      live spoke (${r.cfAuto.toFixed(1)}%)`:""}, but you could not open this in a single Aave v4 spoke right now.</div></div>`);
+      The numbers below still price it at today's rates${r.cfIsHypo?`, using the best collateral factor each token reaches on this
+      chain (${r.cfAuto.toFixed(1)}%)`:""}, but you could not open this in a single Aave v4 spoke right now.</div></div>`);
   }
   if(r.isPool.col||r.isPool.debt){
     flags.push(`<div class="flag warn"><span>⚠</span><div><b>${r.isPool.col&&r.isPool.debt?"Smart collateral and smart debt are":"A two-token pool leg is"} not an Aave v4 primitive yet.</b>
       That is exactly what the DEX Spoke initiative would add — so the swap-fee figure is your assumption, and no collateral factor
       is published for a pool used as collateral.</div></div>`);
   }
+  if(r.debtNat>0.005){
+    flags.push(`<div class="flag warn"><span>⚠</span><div><b>Your debt token earns yield of its own (${r.debtNat.toFixed(2)}%), so it costs you.</b>
+      Borrowing an appreciating token means the debt grows with it — that is added to the borrow rate, not ignored.</div></div>`);
+  }
   if(r.spread<0){
     flags.push(`<div class="flag bad"><span>⚠</span><div><b>Leverage is working against you.</b> Net supply ${r.S.toFixed(2)}% sits below
       net borrow ${r.B.toFixed(2)}% — a spread of ${sgn(r.spread,2)}%. Every extra loop lowers the result: unlevered pays
       ${f(r.unlev,true)}, this loop pays ${f(r.apr,true)}.</div></div>`);
   }
+  if(r.noNat.length)
+    flags.push(`<div class="flag warn"><span>⚠</span><div>No published native yield for <b>${r.noNat.join(", ")}</b> — counted as 0%.
+      If it is a staking or yield-bearing token, type its rate into the box under the selector.</div></div>`);
   if(r.missing.length)
     flags.push(`<div class="flag bad"><span>⚠</span><div>No live Aave rate found for <b>${r.missing.join(", ")}</b> — treated as 0%.</div></div>`);
   $("flags").innerHTML=flags.join("");
 
   const steps=[
-    {k:"native",lbl:"the collateral tokens' own yield", v:r.eng.native, chip:"native"},
+    {k:"native",lbl:"collateral's own yield, less what the debt token accrues", v:r.eng.native, chip:"native"},
     {k:"fees",  lbl:"swap fees on the pool leg(s)",     v:r.eng.fees,   chip:"fees"},
     {k:"inc",   lbl:"campaign rewards, while they run", v:r.eng.inc,    chip:"inc"}
   ].filter(s=>Math.abs(s.v)>=0.005);
@@ -570,7 +696,7 @@ function render(){
     <td>${chip?`<span class="chip ${chip}">${nm[chip]}</span>`:""}<span class="ladder-lbl">${lbl}</span></td>
     <td class="numeric ${val>=0?"pos":"neg"}">${f(val,true)}</td>
     <td class="numeric" style="color:var(--text-mute)">${delta==null?"":sgn(delta,2)+"pp"}</td></tr>`;
-  let run=r.eng.lend, body=row("lend minus borrow, nothing else", r.eng.lend, null, "", "base");
+  let run=r.eng.lend, body=row("Aave lend minus Aave borrow, nothing else", r.eng.lend, null, "", "base");
   steps.forEach(s=>{ run+=s.v; body+=row(s.lbl, run, s.v, "", s.chip); });
   body+=row("= your net APR", r.apr, null, "total", "");
   const flips=steps.filter(s=>(r.apr-s.v<0)!==(r.apr<0));
@@ -578,7 +704,7 @@ function render(){
       ? `<b>${nm[flips[0].chip]} alone decides the sign.</b> Remove it and this loop pays ${f(r.apr-flips[0].v,true)}.`
     : flips.length>1
       ? `<b>No single engine carries it</b> — removing any one of ${flips.map(s=>nm[s.chip].toLowerCase()).join(" or ")} flips the sign.`
-    : r.eng.lend<0 ? `The lending spread alone is ${f(r.eng.lend,true)}; the engines above carry the rest.`
+    : r.eng.lend<0 ? `The Aave lending spread alone is ${f(r.eng.lend,true)}; the engines above carry the rest.`
     : `Every engine is additive here — none alone is load-bearing for the sign.`;
   $("ladder").innerHTML=`<div class="ladder">
     <div class="ladder-h">Where the ${f(r.apr,true)} comes from
@@ -597,33 +723,49 @@ function render(){
 
 function renderMethod(){
   $("methodcard").innerHTML=`
-  <div><b>What this computes.</b> The loop identity — the same one the Loop Economics page reconciles against Fluid's own vault
-    pages: <code>Net APR = Supply × C − Borrow × (C−1)</code>. With <b>n</b> loops at collateral factor <b>CF</b> you end up holding
-    <code>C = (1 − CF^(n+1)) / (1 − CF)</code> units of collateral per unit of your own money, and <code>C − 1</code> of debt. As n
-    grows this approaches the familiar ceiling <code>1/(1−CF)</code> — 20× at 95%, 12.5× at 92%, 5× at 80%.</div>
-  <div><b>Where the rates come from.</b> Supply and borrow APYs, collateral factors and borrowable flags are read live from Aave's
-    public API for Ethereum. Collateral factor is <b>spoke-scoped</b>, not hub-wide — wstETH is 95.5% on the Lido spoke but 80% on
-    Main — so the builder resolves the specific spoke that supports your exact combination and uses that spoke's CF, or tells you
-    that no spoke does. Token native yields (staking, funding) come from Fluid's <code>stakingApr</code> and are <b>additive</b> to
-    Aave's supply rate: they accrue in the token's own exchange rate, off Aave's book, which is why Aave itself pays ~0% on wstETH,
-    weETH and sUSDe.</div>
+  <div><b>This prices Aave v4, and only Aave v4.</b> Every supply rate, borrow rate, collateral factor, borrowable flag and spoke
+    on this page is read live from Aave's public API. Fluid appears in one place and one place only: as a starting value for each
+    token's <b>native yield</b> — the staking or funding rate the token earns by itself. Aave does not publish that, because it
+    accrues in the token's own exchange rate rather than on Aave's book, which is why Aave pays ~0% on wstETH, weETH and sUSDe even
+    though holding them earns 2&ndash;4%. Every native-yield box is <b>editable</b> and labelled with its source, so you can
+    override it or supply one where none is published.</div>
+  <div><b>Chain and market matter.</b> Aave v4 runs on Ethereum (Core, Plus, Prime, Global Dollar) and Avalanche (Core). Rates for
+    the same token differ sharply between them — GHO borrows at 2.60% on one Ethereum hub and 7.27% on another; USDC ranges 0.81%
+    to 4.61% across hubs. Pick a hub/spoke explicitly, or leave it on <b>auto</b> and the builder finds the spoke that supports your
+    combination, preferring the highest collateral factor. A loop must live inside <b>one spoke</b>: the spoke sets the collateral
+    factor <i>and</i> decides what is borrowable against it — wstETH is 95.5% on Lido but 80% on Main.</div>
+  <div><b>What this computes.</b> <code>Net APR = Supply × C − Borrow × (C−1)</code>. With <b>n</b> loops at collateral factor
+    <b>CF</b> you hold <code>C = (1 − CF^(n+1)) / (1 − CF)</code> units of collateral per unit of your own money and
+    <code>C − 1</code> of debt, approaching the ceiling <code>1/(1−CF)</code> only in the limit — 10 loops at 95.5% is 8.83×, not
+    22.2×. Native yield counts on <b>both</b> sides: income on the collateral, and a <b>cost</b> on the debt, since borrowing an
+    appreciating token means the debt grows with it.</div>
   <div><b>What you supply.</b> The swap-fee APR on any two-token leg, the number of loops, and any campaign rewards. Swap fees are
     an input because <b>a DEX pool as collateral or debt is not an Aave v4 primitive today</b> — that is precisely what the DEX Spoke
-    initiative would add. Where a matching Fluid pool exists, the builder offers its current trading APR as a starting point; treat a
-    single reading as noisy and prefer a longer average.</div>
-  <div><b>What it does not model.</b> Impermanent loss on a two-token leg, entry slippage, gas, liquidation, or the price path of any
-    token. A negative carry spread means every extra loop <i>subtracts</i> — the builder flags that case, because a positive headline
+    initiative would add. Where a matching Fluid pool exists the builder offers its live trading APR as a starting point; a single
+    reading is noisy, so prefer a longer average.</div>
+  <div><b>What it does not model.</b> Impermanent loss on a two-token leg, entry slippage, gas, liquidation, or the price path of
+    any token. A negative carry spread means every extra loop <i>subtracts</i> — the builder flags that, because a positive headline
     can still be worse than simply holding the collateral unlevered.</div>`;
 }
 
 document.addEventListener("change",function(e){
   const t=e.target;
-  if(t.dataset.leg!=null){ state[t.dataset.leg][+t.dataset.i].sym=t.value||null; renderLegs(); render(); }
-  else if(t.dataset.w!=null){ state[t.dataset.w][+t.dataset.i].w=Math.max(1,Math.min(99,+t.value||1)); render(); }
+  if(t.id==="chain"){ state.chainId=+t.value; state.spokeKey="auto";
+    state.col=[{sym:null,w:100}]; state.debt=[{sym:null,w:100}]; state.cfAuto=true;
+    renderMarket(); renderLegs(); render(); }
+  else if(t.id==="spoke"){ state.spokeKey=t.value;
+    const cl=colList(), dl=debtList();
+    state.col.forEach(x=>{ if(x.sym&&cl.indexOf(x.sym)<0) x.sym=null; });
+    state.debt.forEach(x=>{ if(x.sym&&dl.indexOf(x.sym)<0) x.sym=null; });
+    state.cfAuto=true; renderMarket(); renderLegs(); render(); }
+  else if(t.dataset.leg!=null){ state[t.dataset.leg][+t.dataset.i].sym=t.value||null; state.cfAuto=true; renderLegs(); render(); }
+  else if(t.dataset.w!=null){ state[t.dataset.w][+t.dataset.i].w=Math.max(1,Math.min(99,+t.value||1)); renderLegs(); render(); }
 });
 document.addEventListener("input",function(e){
   const t=e.target;
-  if(t.id==="loops"){ state.loops=+t.value; $("loops-num").value=t.value; render(); }
+  if(t.dataset.nat!=null){ const v=t.value.trim(); if(v==="") delete NAT_OVERRIDE[t.dataset.nat];
+    else NAT_OVERRIDE[t.dataset.nat]=+v||0; render(); }
+  else if(t.id==="loops"){ state.loops=+t.value; $("loops-num").value=t.value; render(); }
   else if(t.id==="loops-num"){ state.loops=+t.value; $("loops").value=Math.min(40,+t.value||0); render(); }
   else if(t.id==="cf"){ state.cfAuto=false; state.cf=+t.value; render(); }
   else if(t.id==="col-fee"){ state.colFee=+t.value; render(); }
@@ -645,17 +787,20 @@ document.addEventListener("click",function(e){
 
 function paintSources(){
   const t=SRC.aave.at||SRC.fluid.at||"";
-  const ok=[], bits=[];
-  if(SRC.aave.state==="live") ok.push("Aave v4");
-  if(SRC.fluid.state==="live") ok.push("Fluid");
-  if(ok.length) bits.push(`<span class="src"><span class="sdot live"></span>${ok.join(" · ")} — live ${t}</span>`);
-  [["Aave v4","aave"],["Fluid","fluid"]].forEach(function(p){
-    if(SRC[p[1]].state!=="live")
-      bits.push(`<span class="src"><span class="sdot ${SRC[p[1]].state==="wait"?"wait":"stale"}"></span>${p[0]}: ${SRC[p[1]].state==="wait"?"loading…":"unavailable"}</span>`);
-  });
-  if(SPOKES.length) bits.push(`<span class="src"><span class="sdot live"></span>${SPOKES.length} spokes · ${ALLCOL.length} collateral · ${ALLDEBT.length} borrowable</span>`);
+  const bits=[];
+  bits.push(SRC.aave.state==="live"
+    ? `<span class="src"><span class="sdot live"></span><b style="color:var(--text-dim)">Aave v4 — all rates &amp; collateral factors</b> — live ${t}</span>`
+    : `<span class="src"><span class="sdot ${SRC.aave.state==="wait"?"wait":"stale"}"></span>Aave v4: ${SRC.aave.state==="wait"?"loading…":"unavailable"}</span>`);
+  bits.push(SRC.fluid.state==="live"
+    ? `<span class="src"><span class="sdot live"></span>Fluid — native token yields only (editable)</span>`
+    : `<span class="src"><span class="sdot ${SRC.fluid.state==="wait"?"wait":"stale"}"></span>Fluid: ${SRC.fluid.state==="wait"?"loading…":"unavailable — enter native yields yourself"}</span>`);
+  if(SPOKES.length){
+    const loopable=SPOKES.filter(s=>Object.keys(s.coll).length&&s.borrow.size);
+    const here=loopable.filter(s=>s.chainId===state.chainId);
+    bits.push(`<span class="src"><span class="sdot live"></span>${CHAINS.length} chains · ${loopable.length} loop-capable spokes (${here.length} on this chain)</span>`);
+  }
   $("srcline").innerHTML=bits.join("");
-  $("asof").textContent = ok.length?"live "+t:"unavailable";
+  $("asof").textContent = SRC.aave.state==="live"?"live "+t:"unavailable";
 }
 
 async function refresh(){
@@ -666,16 +811,15 @@ async function refresh(){
   SRC.fluid = res[1].status==="fulfilled"?{state:"live",at:t}:{state:"stale",at:SRC.fluid.at};
   if(res[0].status==="rejected") console.warn("aave load failed:",res[0].reason);
   if(res[1].status==="rejected") console.warn("fluid load failed:",res[1].reason);
-  try{ renderLegs(); render(); paintSources(); }
+  try{ renderMarket(); renderLegs(); render(); paintSources(); }
   catch(err){ console.error("render failed:",err); }
   finally{ btn.disabled=false; btn.classList.remove("loading"); }
 }
 
-/* boot — open on the canonical wstETH → WETH loop so the page shows something real */
-renderMethod(); renderLegs(); render(); paintSources();
+renderMethod(); renderMarket(); renderLegs(); render(); paintSources();
 refresh().then(function(){
-  if(!state.col[0].sym && ALLCOL.indexOf("wstETH")>=0) state.col[0].sym="wstETH";
-  if(!state.debt[0].sym && ALLDEBT.indexOf("WETH")>=0) state.debt[0].sym="WETH";
+  if(!state.col[0].sym && colList().indexOf("wstETH")>=0) state.col[0].sym="wstETH";
+  if(!state.debt[0].sym && debtList().indexOf("WETH")>=0) state.debt[0].sym="WETH";
   state.cfAuto=true;
   renderLegs(); render();
 }).catch(console.error);
