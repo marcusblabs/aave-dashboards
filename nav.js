@@ -41,7 +41,8 @@
   var ITEMS = [
     { label: 'Overview',       href: '',                     icon: 'home'   },
     { label: 'Spoke Caps',     href: 'spoke-caps/',          icon: 'gauge'  },
-    { label: 'Loop Economics', href: 'vault-economics.html', icon: 'layers' }
+    { label: 'Loop Economics', href: 'vault-economics.html', icon: 'layers' },
+    { label: 'Loop Builder',   href: 'loop-builder.html',    icon: 'gauge'  }
   ];
 
   /* ---- active state: compare resolved URLs, not raw strings ---- */

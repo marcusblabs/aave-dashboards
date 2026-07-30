@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Theme bootstrap: blocking and FIRST, so a light-theme user never sees a dark flash. -->
+<script>try{if(localStorage.getItem('le-theme')==='light')document.documentElement.dataset.theme='light'}catch(e){}</script>
+<script defer src="nav.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://api.fontshare.com" crossorigin>
+<link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<title>Loop Builder · Aave v4 Dashboards</title>
+<style>
+  :root {
+    --bg:#383e47; --bg-elev:#3f4650; --bg-elev-2:#464d58; --bg-hover:#464d58;
+    --border:rgba(255,255,255,0.08); --border-strong:rgba(255,255,255,0.16); --panel-border:rgba(255,255,255,0.09);
+    --input-bg:#353b44; --input-border:#535d6a;
+    --text:rgba(255,255,255,0.92); --text-dim:#c2cbd8; --text-mute:#b3bdcc;
+    --primary:#7f6ae8; --primary-dim:#6b54e0; --primary-hov:#b3aef5;
+    --primary-soft:rgba(127,106,232,0.12); --primary-bord:rgba(127,106,232,0.30);
+    --accent:#eaa879; --accent-soft:rgba(234,168,121,0.12);
+    --pos:#63f2be; --pos-soft:rgba(99,242,190,0.12);
+    --neg:#f9b5a8; --neg-soft:rgba(249,181,168,0.12);
+    --slate:#8b97ac; --slate-soft:rgba(139,151,172,0.14);
+    --radius:8px; --radius-sm:6px;
+    --font-sans:'Satoshi',-apple-system,'Segoe UI',sans-serif;
+    --font-mono:'JetBrains Mono','SF Mono',ui-monospace,monospace;
+    --card-shadow:0 0 0 1px rgba(0,0,0,.02), 1px 1px 1px -.5px rgba(0,0,0,.06), 3px 3px 3px -1.5px rgba(0,0,0,.06), 6px 6px 6px -3px rgba(0,0,0,.06), 12px 12px 12px -6px rgba(0,0,0,.06), 24px 24px 24px -12px rgba(0,0,0,.1), -.5px -1px 0 0 rgba(255,255,255,.15);
+    --glow:rgba(127,106,232,0.10);
+  }
+  :root[data-theme="light"] {
+    --bg:#eef0f4; --bg-elev:#f8f9fb; --bg-elev-2:#e5e8ee; --bg-hover:#e5e8ee;
+    --border:rgba(20,26,38,0.09); --border-strong:rgba(20,26,38,0.18); --panel-border:rgba(20,26,38,0.10);
+    --input-bg:#ffffff; --input-border:#c3cad6;
+    --text:#232833; --text-dim:#454e5e; --text-mute:#5b6575;
+    --primary:#6b54e0; --primary-dim:#5a43cf; --primary-hov:#5a43cf;
+    --primary-soft:rgba(107,84,224,0.10); --primary-bord:rgba(107,84,224,0.30);
+    --accent:#a05a24; --accent-soft:rgba(192,122,62,0.12);
+    --pos:#0a7a55; --pos-soft:rgba(14,158,112,0.11);
+    --neg:#bc4531; --neg-soft:rgba(207,88,67,0.11);
+    --slate:#667185; --slate-soft:rgba(102,113,133,0.12);
+    --card-shadow:0 1px 2px rgba(20,26,38,.06), 0 4px 14px rgba(20,26,38,.05);
+    --glow:rgba(107,84,224,0.07);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:var(--font-sans); background:var(--bg); color:var(--text); min-height:100vh;
+         font-size:14px; line-height:1.45; -webkit-font-smoothing:antialiased; }
+  body::before { content:''; position:fixed; top:-200px; left:50%; transform:translateX(-50%);
+    width:800px; height:600px; background:radial-gradient(ellipse,var(--glow) 0%,transparent 70%);
+    pointer-events:none; z-index:0; }
+  .app { position:relative; z-index:1; }
+  a { color:inherit; text-decoration:none; }
+  .mono { font-family:var(--font-mono); font-variant-numeric:tabular-nums; }
+  .pos { color:var(--pos); } .neg { color:var(--neg); }
+  .topbar { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px;
+    padding:18px 28px; border-bottom:1px solid var(--border); background:var(--bg-elev); }
+  .brand h1 { font-size:18px; font-weight:700; letter-spacing:-0.3px;
+    background:linear-gradient(90deg,#b3aef5 0%,#d7cbe7 25%,#e5c8c8 50%,#eaa879 100%);
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; color:transparent; }
+  :root[data-theme="light"] .brand h1 { background:linear-gradient(90deg,#5a43cf 0%,#7a55b8 45%,#c07a3e 100%);
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; color:transparent; }
+  .brand .sub { color:var(--text-mute); font-size:12px; margin-top:1px; }
+  .topbar .right { display:flex; align-items:center; gap:14px; color:var(--text-mute); font-size:12px; flex-wrap:wrap; }
+  .btn { background:var(--bg-elev); border:1px solid var(--input-border); color:var(--text);
+    padding:0 16px; height:38px; border-radius:var(--radius); font-family:inherit; font-size:13px;
+    font-weight:500; cursor:pointer; transition:background .15s,border-color .15s,color .15s;
+    display:inline-flex; align-items:center; gap:8px; }
+  .btn:hover { background:var(--bg-hover); border-color:var(--text-mute); }
+  .btn:disabled { opacity:.4; cursor:progress; }
+  .btn.primary { background:var(--primary); border-color:var(--primary); color:#fff; }
+  .btn.primary:hover { background:var(--primary-dim); border-color:var(--primary-dim); }
+  .btn.ghost { background:transparent; }
+  .btn:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
+  .spin { width:13px; height:13px; border:2px solid currentColor; border-right-color:transparent;
+    border-radius:50%; display:none; flex:none; }
+  .btn.loading .spin { display:inline-block; animation:rspin .7s linear infinite; }
+  @keyframes rspin { to { transform:rotate(360deg); } }
+  .sources-bar { padding:12px 28px; background:var(--bg); border-bottom:1px solid var(--border); }
+  .srcline { display:flex; flex-wrap:wrap; gap:6px 18px; font-family:var(--font-mono); font-size:11.5px;
+    color:var(--text-mute); align-items:center; max-width:1240px; margin:0 auto; }
+  .srcline .src { display:inline-flex; align-items:center; gap:6px; }
+  .sdot { width:7px; height:7px; border-radius:50%; display:inline-block; flex:none; }
+  .sdot.live { background:var(--pos); } .sdot.stale { background:var(--accent); }
+  .sdot.wait { background:var(--slate); opacity:.4; }
+  .shell { max-width:1240px; margin:0 auto; padding:0 28px; }
+  section.block { padding:24px 0; border-bottom:1px solid var(--border); }
+  section.block:last-of-type { border-bottom:none; }
+  .block-head { display:flex; align-items:baseline; justify-content:space-between; gap:12px;
+    flex-wrap:wrap; margin-bottom:14px; }
+  .block-head h2 { font-size:17px; font-weight:700; letter-spacing:-.2px; }
+  .block-head .note { color:var(--text-mute); font-size:12px; }
+  .builder { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,420px); gap:18px; align-items:start; }
+  @media (max-width:980px){ .builder { grid-template-columns:minmax(0,1fr); } }
+  .panel { background:var(--bg-elev); border:1px solid var(--panel-border); border-radius:var(--radius);
+    box-shadow:var(--card-shadow); padding:16px 18px; }
+  .panel + .panel { margin-top:14px; }
+  .panel h3 { font-family:var(--font-mono); font-size:10.5px; letter-spacing:.07em; text-transform:uppercase;
+    color:var(--primary-hov); margin-bottom:12px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .panel h3 .hint { font-family:var(--font-sans); font-size:11.5px; letter-spacing:0; text-transform:none;
+    color:var(--text-mute); font-weight:400; margin-left:auto; }
+  .leg { display:flex; flex-direction:column; gap:9px; }
+  .tokrow { display:grid; grid-template-columns:minmax(0,1fr) 78px auto; gap:8px; align-items:center; }
+  .tokrow.single { grid-template-columns:minmax(0,1fr) auto; }
+  select, input[type=number], input[type=text] {
+    width:100%; background:var(--input-bg); border:1px solid var(--input-border); color:var(--text);
+    border-radius:var(--radius-sm); padding:8px 10px; font-family:var(--font-mono); font-size:12.5px;
+    font-variant-numeric:tabular-nums; }
+  select:focus-visible, input:focus-visible { outline:2px solid var(--primary); outline-offset:1px; }
+  input[type=number] { text-align:right; }
+  .iconbtn { background:transparent; border:1px solid var(--input-border); color:var(--text-mute);
+    border-radius:var(--radius-sm); width:30px; height:34px; cursor:pointer; font-size:15px; line-height:1;
+    display:grid; place-items:center; }
+  .iconbtn:hover { border-color:var(--primary-bord); color:var(--primary-hov); background:var(--primary-soft); }
+  .iconbtn:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
+  .fld { display:grid; grid-template-columns:1fr 110px; gap:10px; align-items:center; margin-top:9px; }
+  .fld label { font-size:12.5px; color:var(--text-mute); }
+  .fld label b { color:var(--text-dim); font-weight:600; }
+  .fld .sub { display:block; font-size:11px; color:var(--text-mute); margin-top:2px; }
+  .rangerow { display:grid; grid-template-columns:1fr 92px; gap:10px; align-items:center; margin-top:9px; }
+  input[type=range]{ width:100%; accent-color:var(--primary); }
+  .prefill { font-family:var(--font-mono); font-size:10.5px; color:var(--accent); margin-top:4px; cursor:pointer;
+    background:none; border:none; padding:0; text-align:left; }
+  .prefill:hover { text-decoration:underline; }
+  .result { position:sticky; top:14px; }
+  .bigapr { text-align:center; padding:6px 0 12px; }
+  .bigapr .v { font-family:var(--font-mono); font-size:44px; font-weight:700; letter-spacing:-1.5px;
+    font-variant-numeric:tabular-nums; line-height:1.05; }
+  .bigapr .k { font-size:11px; font-family:var(--font-mono); letter-spacing:.07em; text-transform:uppercase;
+    color:var(--text-mute); }
+  .bigapr .sub { font-size:12px; color:var(--text-mute); margin-top:5px; }
+  .stats { display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--border);
+    border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; margin-top:4px; }
+  .stat { background:var(--bg-elev); padding:9px 12px; }
+  .stat .k { font-size:10px; font-family:var(--font-mono); letter-spacing:.05em; text-transform:uppercase; color:var(--text-mute); }
+  .stat .v { font-family:var(--font-mono); font-size:15px; font-weight:600; margin-top:2px; font-variant-numeric:tabular-nums; }
+  .flag { display:flex; gap:8px; align-items:flex-start; font-size:12px; line-height:1.55; padding:9px 12px;
+    border-radius:var(--radius-sm); margin-top:10px; }
+  .flag.ok   { background:var(--pos-soft);   color:var(--text-dim); border-left:3px solid var(--pos); }
+  .flag.warn { background:var(--accent-soft);color:var(--text-dim); border-left:3px solid var(--accent); }
+  .flag.bad  { background:var(--neg-soft);   color:var(--text-dim); border-left:3px solid var(--neg); }
+  .flag b { color:var(--text); }
+  .ladder { margin-top:12px; background:var(--bg); border:1px solid var(--panel-border);
+    border-left:3px solid var(--accent); border-radius:var(--radius); padding:12px 14px; }
+  .ladder-h { font-size:12.5px; font-weight:700; color:var(--text-dim); margin-bottom:8px; }
+  .ladder-note { font-weight:400; color:var(--text-mute); font-size:11.5px; margin-left:6px; }
+  .ladder table { width:100%; border-collapse:collapse; table-layout:fixed; font-size:12.5px; }
+  .ladder td { padding:5px 0; border-bottom:1px solid var(--border); color:var(--text-mute); overflow-wrap:anywhere; }
+  .ladder td:first-child { width:52%; }
+  .ladder td.numeric { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; padding-left:10px;
+    font-family:var(--font-mono); }
+  .ladder tr.total td { border-bottom:none; font-weight:700; color:var(--text); padding-top:7px; }
+  .ladder-lbl { display:block; margin-top:3px; color:var(--text-mute); font-size:11.5px; line-height:1.4; }
+  .chip { display:inline-block; padding:2px 8px; border-radius:999px; font-size:10.5px; font-weight:500; white-space:nowrap; }
+  .chip.base{background:var(--slate-soft);color:var(--slate);} .chip.native{background:var(--pos-soft);color:var(--pos);}
+  .chip.fees{background:var(--accent-soft);color:var(--accent);} .chip.inc{background:var(--primary-soft);color:var(--primary-hov);}
+  .mathbar { margin-top:12px; background:var(--bg-elev-2); border-radius:var(--radius-sm); padding:12px; text-align:center; }
+  .mathrow { font-family:var(--font-mono); font-size:13px; display:flex; flex-wrap:wrap; align-items:center;
+    gap:6px; justify-content:center; }
+  .mathrow .sup { color:var(--pos); } .mathrow .bor { color:var(--neg); } .mathrow .op { color:var(--text-mute); }
+  .mathnote { font-family:var(--font-mono); font-size:10.5px; color:var(--text-mute); margin-top:7px; line-height:1.5; }
+  .method { font-size:13px; color:var(--text-mute); line-height:1.65; background:var(--bg-elev);
+    border:1px solid var(--panel-border); border-left:3px solid var(--primary); border-radius:var(--radius);
+    padding:15px 18px; box-shadow:var(--card-shadow); }
+  .method b { color:var(--text-dim); }
+  .method > div { margin-bottom:8px; } .method > div:last-child { margin-bottom:0; }
+  .method code { font-family:var(--font-mono); font-size:11.5px; background:var(--bg-elev-2); padding:1px 5px; border-radius:4px; }
+  .footer { padding:14px 28px; border-top:1px solid var(--border); background:var(--bg-elev);
+    color:var(--text-mute); font-size:11.5px; display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+  .footer a { color:var(--text-dim); } .footer a:hover { color:var(--primary-hov); }
+  @media (max-width:900px){
+    body::before{display:none;} .topbar{padding:14px 16px;} .sources-bar{padding:10px 16px;}
+    .shell{padding:0 16px;} .footer{padding:12px 16px;} .result{position:static;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="topbar">
+    <div class="brand">
+      <h1>Custom Loop Builder</h1>
+      <div class="sub">Price any collateral / debt combination at Aave v4 rates &mdash; live</div>
+    </div>
+    <div class="right">
+      <button class="btn ghost" id="themebtn" type="button" aria-label="Toggle light/dark theme">◐</button>
+      <span class="mono" id="asof">loading…</span>
+      <button class="btn primary" id="refreshbtn" type="button"><span class="spin" aria-hidden="true"></span><span>Refresh rates</span></button>
+    </div>
+  </div>
+
+  <div class="sources-bar">
+    <div class="srcline" id="srcline"><span class="src"><span class="sdot wait"></span>loading Aave v4 + Fluid…</span></div>
+  </div>
+
+  <div class="shell">
+    <section class="block">
+      <div class="block-head">
+        <h2>Build a loop</h2>
+        <span class="note">every rate below is read live &mdash; you supply the structure, the swap fee and the number of loops</span>
+      </div>
+
+      <div class="builder">
+        <div>
+          <div class="panel">
+            <h3>Collateral — what you deposit <span class="hint" id="col-hint"></span></h3>
+            <div class="leg" id="col-leg"></div>
+            <button class="btn ghost" id="col-add" type="button" style="height:32px;font-size:12px;margin-top:10px">+ add a second token (smart collateral)</button>
+            <div id="col-fee-wrap" hidden>
+              <div class="fld">
+                <label><b>Swap-fee APR earned</b><span class="sub">a two-token pool earns trading fees on the collateral side</span></label>
+                <input type="number" id="col-fee" step="0.01" min="0" value="0">
+              </div>
+              <button class="prefill" id="col-fee-prefill" hidden type="button"></button>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h3>Debt — what you borrow <span class="hint" id="debt-hint"></span></h3>
+            <div class="leg" id="debt-leg"></div>
+            <button class="btn ghost" id="debt-add" type="button" style="height:32px;font-size:12px;margin-top:10px">+ add a second token (smart debt)</button>
+            <div id="debt-fee-wrap" hidden>
+              <div class="fld">
+                <label><b>Swap-fee APR rebated</b><span class="sub">a two-token debt pool earns fees too, offsetting the borrow cost</span></label>
+                <input type="number" id="debt-fee" step="0.01" min="0" value="0">
+              </div>
+              <button class="prefill" id="debt-fee-prefill" hidden type="button"></button>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h3>Leverage</h3>
+            <div class="rangerow">
+              <div>
+                <label style="font-size:12.5px;color:var(--text-mute)"><b style="color:var(--text-dim)">Number of loops</b>
+                  <span class="sub" id="loops-sub">deposit &rarr; borrow &rarr; swap back &rarr; repeat</span></label>
+                <input type="range" id="loops" min="0" max="40" step="1" value="10">
+              </div>
+              <input type="number" id="loops-num" min="0" max="200" step="1" value="10">
+            </div>
+            <div class="fld">
+              <label><b>Collateral factor</b><span class="sub" id="cf-sub">auto from the live spoke</span></label>
+              <input type="number" id="cf" step="0.1" min="1" max="99" value="80">
+            </div>
+          </div>
+
+          <div class="panel">
+            <h3>Incentives <span class="hint">optional — Merkl-style campaign</span></h3>
+            <div class="fld">
+              <label><b>Supply reward APR</b><span class="sub">paid on the full leveraged collateral</span></label>
+              <input type="number" id="sup-inc" step="0.01" min="0" value="0">
+            </div>
+            <div class="fld">
+              <label><b>Borrow rebate APR</b><span class="sub">paid on the debt, cutting its cost</span></label>
+              <input type="number" id="bor-inc" step="0.01" min="0" value="0">
+            </div>
+          </div>
+        </div>
+
+        <div class="result">
+          <div class="panel">
+            <div class="bigapr">
+              <div class="k">Net APR on your own money</div>
+              <div class="v" id="apr">—</div>
+              <div class="sub" id="apr-sub"></div>
+            </div>
+            <div class="stats">
+              <div class="stat"><div class="k">Leverage</div><div class="v" id="s-lev">—</div></div>
+              <div class="stat"><div class="k">Unlevered</div><div class="v" id="s-unlev">—</div></div>
+              <div class="stat"><div class="k">Net supply</div><div class="v pos" id="s-sup">—</div></div>
+              <div class="stat"><div class="k">Net borrow</div><div class="v neg" id="s-bor">—</div></div>
+            </div>
+            <div id="flags"></div>
+            <div id="ladder"></div>
+            <div class="mathbar" id="mathbar"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="block-head"><h2>Method &amp; caveats</h2></div>
+      <div class="method" id="methodcard"></div>
+    </section>
+  </div>
+</div>
+
+<div class="footer">
+  <span>Rates from <a href="https://api.aave.com/graphql" target="_blank" rel="noopener">Aave v4 API</a> &middot; native yields from <a href="https://api.fluid.instadapp.io/" target="_blank" rel="noopener">Fluid</a> &middot; not affiliated with Aave &middot; nothing here is financial advice</span>
+  <span><a href="./">All dashboards</a> · <a href="vault-economics.html">Loop Economics</a></span>
+</div>
+<script>
+/* ============================================================================
+   CUSTOM LOOP BUILDER — pick the legs, set the fee and the loop count, get the APR.
+   Same maths the Loop Economics page validates against Fluid's own vault pages,
+   driven by your inputs instead of a fixed structure list.
+   ============================================================================ */
+
+const AAVE_URL="https://api.aave.com/graphql";
+const FLUID_URL="https://api.fluid.instadapp.io/v2/1/vaults";
+
+/* This API REJECTS an unused variable declaration, so a query that reads no fiat
+   field must not declare $currency. */
+const Q_HUBS=`{ hubs(request:{query:{chainIds:[1]}}) { id name } }`;
+const Q_ASSETS=`query($h: ID!){ hubAssets(request:{query:{hubId:$h}}) {
+  underlying { info { symbol } }
+  summary { supplyApy { value } borrowApy { value } utilizationRate { value } } } }`;
+const Q_RESERVES=`{ reserves(request:{query:{chainIds:[1]}}) {
+  spoke { name }
+  asset { underlying { info { symbol } } hub { name } }
+  settings { collateralFactor { value } borrowable collateral }
+  status { frozen }
+  canBorrow } }`;
+
+/* rates come back as decimal FRACTIONS in high-precision strings: 0.0387 = 3.87% */
+const pct=v=>v==null?null:parseFloat(v.value!=null?v.value:v)*100;
+const num=x=>x==null?0:parseFloat(x);
+const f=(x,s)=>((x<0?"−":s?"+":"")+Math.abs(x).toFixed(2)+"%");
+const sgn=(x,dp)=>(x<0?"−":"+")+Math.abs(x).toFixed(dp);
+const $=id=>document.getElementById(id);
+
+const SRC={aave:{state:"wait",at:null},fluid:{state:"wait",at:null}};
+let SPOKES=[], RATES={}, NATIVE={}, POOLFEE={}, ALLCOL=[], ALLDEBT=[];
+
+async function gql(query,variables){
+  const r=await fetch(AAVE_URL,{method:"POST",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({query,variables:variables||{}})});
+  const j=await r.json();
+  if(j.errors&&j.errors.length) throw new Error(j.errors[0].message);
+  return j.data;
+}
+
+async function loadAave(){
+  const {hubs}=await gql(Q_HUBS);
+  const [assetSets,reserves]=await Promise.all([
+    Promise.all(hubs.map(h=>gql(Q_ASSETS,{h:h.id}).then(d=>({hub:h.name,rows:d.hubAssets})))),
+    gql(Q_RESERVES).then(d=>d.reserves),
+  ]);
+  RATES={};
+  for(const set of assetSets)
+    for(const a of set.rows) RATES[set.hub+"|"+a.underlying.info.symbol]={
+      supplyApy:pct(a.summary.supplyApy)||0,
+      borrowApy:pct(a.summary.borrowApy)||0,
+      util:pct(a.summary.utilizationRate)||0 };
+  /* A loop lives inside ONE SPOKE: the spoke sets the collateral factor AND decides what is
+     borrowable against it. Grouping by hub alone would silently pair a 95.5% Lido CF with a
+     borrow that spoke does not actually offer. */
+  const byspoke={};
+  for(const r of reserves){
+    const hub=r.asset.hub.name, sp=r.spoke.name, sym=r.asset.underlying.info.symbol;
+    const key=hub+" / "+sp;
+    const e=byspoke[key]||(byspoke[key]={hub,spoke:sp,coll:{},borrow:new Set()});
+    if(r.status.frozen) continue;
+    if(r.settings.borrowable&&r.canBorrow) e.borrow.add(sym);
+    const cf=parseFloat((r.settings.collateralFactor||{}).value||0)*100;
+    if(r.settings.collateral&&cf>0) e.coll[sym]={cf};
+  }
+  SPOKES=Object.values(byspoke).filter(s=>Object.keys(s.coll).length||s.borrow.size);
+  ALLCOL =[...new Set(SPOKES.flatMap(s=>Object.keys(s.coll)))].sort();
+  ALLDEBT=[...new Set(SPOKES.flatMap(s=>[...s.borrow]))].sort();
+}
+
+async function loadFluid(){
+  const vaults=await(await fetch(FLUID_URL)).json();
+  NATIVE={}; POOLFEE={};
+  const norm=s=>s==="ETH"?"WETH":s;
+  for(const v of vaults){
+    for(const side of ["supplyToken","borrowToken"])
+      for(const k of ["token0","token1"]){
+        const t=(v[side]||{})[k];
+        if(t&&t.symbol&&num(t.stakingApr)>0) NATIVE[norm(t.symbol)]=num(t.stakingApr)/100;
+      }
+    if(+v.type<=1) continue;
+    for(const pair of [["supplyToken","supplyRate"],["borrowToken","borrowRate"]]){
+      const ts=["token0","token1"].map(k=>(v[pair[0]]||{})[k]).filter(t=>t&&t.symbol).map(t=>norm(t.symbol));
+      if(ts.length<2) continue;
+      const key=ts.slice().sort().join("|"), tr=num(v[pair[1]].dex.trading)/100;
+      if(!POOLFEE[key]||tr>POOLFEE[key]) POOLFEE[key]=tr;
+    }
+  }
+}
+
+const state={ col:[{sym:null,w:100}], debt:[{sym:null,w:100}], colFee:0, debtFee:0,
+              loops:10, cf:null, cfAuto:true, supInc:0, borInc:0 };
+
+function tokenOptions(list,selected){
+  return `<option value="">— choose a token —</option>`+list.map(s=>
+    `<option value="${s}"${s===selected?" selected":""}>${s}</option>`).join("");
+}
+
+function renderLegs(){
+  ["col","debt"].forEach(function(leg){
+    const arr=state[leg], list=leg==="col"?ALLCOL:ALLDEBT;
+    $(leg+"-leg").innerHTML=arr.map((t,i)=>`
+      <div class="tokrow${arr.length<2?" single":""}">
+        <select data-leg="${leg}" data-i="${i}" aria-label="${leg} token ${i+1}">${tokenOptions(list,t.sym)}</select>
+        ${arr.length>1?`<input type="number" data-w="${leg}" data-i="${i}" min="1" max="99" step="1" value="${t.w}" aria-label="weight percent">`:``}
+        ${arr.length>1?`<button class="iconbtn" data-rm="${leg}" data-i="${i}" title="remove this token" aria-label="remove">×</button>`:`<span></span>`}
+      </div>`).join("");
+    $(leg+"-add").hidden = arr.length>=2;
+    $(leg+"-fee-wrap").hidden = arr.length<2;
+  });
+}
+
+/* which live spoke supports this exact combination? */
+function resolveSpoke(){
+  const cols=state.col.map(t=>t.sym).filter(Boolean);
+  const debts=state.debt.map(t=>t.sym).filter(Boolean);
+  if(!cols.length||!debts.length) return null;
+  const ok=SPOKES.filter(s=>cols.every(c=>s.coll[c])&&debts.every(d=>s.borrow.has(d)));
+  if(!ok.length) return null;
+  const picked=state.col.filter(t=>t.sym);
+  const tot=picked.reduce((a,t)=>a+t.w,0)||1;
+  const score=s=>picked.reduce((a,t)=>a+s.coll[t.sym].cf*(t.w/tot),0);
+  return ok.sort((a,b)=>score(b)-score(a))[0];
+}
+
+/* explain WHY a combination is not live, leg by leg */
+function diagnose(){
+  const cols=state.col.map(t=>t.sym).filter(Boolean);
+  const debts=state.debt.map(t=>t.sym).filter(Boolean);
+  const out=[];
+  cols.forEach(c=>{ if(!SPOKES.some(s=>s.coll[c])) out.push(`<b>${c}</b> is not collateral-enabled on any live spoke`); });
+  debts.forEach(d=>{ if(!SPOKES.some(s=>s.borrow.has(d))) out.push(`<b>${d}</b> is not borrowable on any live spoke`); });
+  if(out.length) return out;
+  return [`no single spoke offers <b>${cols.join(" + ")}</b> as collateral <i>and</i> lets you borrow <b>${debts.join(" + ")}</b> against it`];
+}
+
+function weights(arr){
+  const tot=arr.reduce((a,t)=>a+(+t.w||0),0)||1;
+  return arr.map(t=>(+t.w||0)/tot);
+}
+
+/* ============ THE MATHS ============
+   n loops of (deposit -> borrow CF -> swap back -> redeposit) leaves you holding
+       C = 1 + CF + CF^2 + ... + CF^n = (1 - CF^(n+1)) / (1 - CF)
+   units of collateral per unit of your own money, and D = C - 1 of debt.
+   C approaches 1/(1-CF) as n grows — the "max leverage" the other page quotes.
+   Net APR on YOUR money = S*C - B*D.                                            */
+function compute(){
+  const spoke=resolveSpoke();
+  const cw=weights(state.col), dw=weights(state.debt);
+  const cols=state.col.map((t,i)=>({sym:t.sym,w:cw[i]})).filter(t=>t.sym);
+  const debts=state.debt.map((t,i)=>({sym:t.sym,w:dw[i]})).filter(t=>t.sym);
+  if(!cols.length||!debts.length) return {ready:false,spoke:spoke,diag:[]};
+
+  const hub=spoke?spoke.hub:null;
+  const missing=[];
+  const rate=function(sym){
+    if(hub&&RATES[hub+"|"+sym]) return RATES[hub+"|"+sym];
+    const all=Object.keys(RATES).filter(k=>k.endsWith("|"+sym)).map(k=>RATES[k]);
+    if(!all.length){ missing.push(sym); return null; }
+    return all[0];
+  };
+  const colLend=cols.reduce((a,t)=>{const r=rate(t.sym); return a+(r?r.supplyApy:0)*t.w;},0);
+  const colNat =cols.reduce((a,t)=>a+(NATIVE[t.sym]||0)*t.w,0);
+  const debtBor=debts.reduce((a,t)=>{const r=rate(t.sym); return a+(r?r.borrowApy:0)*t.w;},0);
+
+  const colFee =state.col.length>1?(+state.colFee||0):0;
+  const debtFee=state.debt.length>1?(+state.debtFee||0):0;
+  const supInc=+state.supInc||0, borInc=+state.borInc||0;
+
+  /* Effective collateral factor, weighted across the basket. With a resolved spoke this is
+     that spoke's own CF. Without one the structure is hypothetical, so fall back to the best
+     CF each token reaches on any live spoke — otherwise a what-if collapses to 1x and cannot
+     be modelled at all. Either way the box stays editable. */
+  const bestCF=sym=>SPOKES.reduce((m,s)=>s.coll[sym]&&s.coll[sym].cf>m?s.coll[sym].cf:m,0);
+  const cfAuto=spoke?cols.reduce((a,t)=>a+spoke.coll[t.sym].cf*t.w,0)
+                    :(cols.every(t=>bestCF(t.sym)>0)?cols.reduce((a,t)=>a+bestCF(t.sym)*t.w,0):null);
+  const cfIsHypo=!spoke&&cfAuto!=null;
+  const cfPct=(state.cfAuto&&cfAuto!=null)?cfAuto:(+state.cf||0);
+  const cf=Math.max(0,Math.min(0.999,cfPct/100));
+
+  const n=Math.max(0,Math.min(200,+state.loops||0));
+  const C=(1-Math.pow(cf,n+1))/(1-cf);
+  const D=C-1;
+
+  const S=colLend+colNat+colFee+supInc;
+  const B=debtBor-debtFee-borInc;
+  const apr=S*C-B*D;
+
+  /* four engines, each through the loop — they sum to apr exactly */
+  const eng={ lend:colLend*C-debtBor*D, native:colNat*C, fees:colFee*C+debtFee*D, inc:supInc*C+borInc*D };
+
+  return {ready:true, spoke:spoke, diag:spoke?[]:diagnose(), missing:[...new Set(missing)],
+          cols:cols, debts:debts, colLend:colLend, colNat:colNat, debtBor:debtBor,
+          cf:cfPct, cfAuto:cfAuto, cfIsHypo:cfIsHypo, n:n, C:C, D:D, S:S, B:B, apr:apr, eng:eng,
+          maxC:1/(1-cf), ltv:C>0?D/C*100:0, unlev:S, spread:S-B,
+          isPool:{col:state.col.length>1, debt:state.debt.length>1}};
+}
+
+function render(){
+  const r=compute();
+
+  if(r.ready&&state.cfAuto&&r.cfAuto!=null) $("cf").value=r.cfAuto.toFixed(1);
+  $("cf-sub").textContent = state.cfAuto
+    ? (r.spoke ? "auto — "+r.spoke.hub+" / "+r.spoke.spoke+" spoke"
+       : r.cfIsHypo ? "best CF each token reaches anywhere — hypothetical"
+       : "no published CF — set it yourself")
+    : "manual override";
+
+  const lev = r.ready ? (r.n===0?"1.00× (no loop)":r.C.toFixed(2)+"×") : "—";
+  $("loops-sub").innerHTML = r.ready
+    ? `${r.n} loop${r.n===1?"":"s"} → <b style="color:var(--text-dim)">${lev}</b> collateral${r.n>0?` · ceiling ${r.maxC.toFixed(2)}×`:""}`
+    : "deposit → borrow → swap back → repeat";
+
+  /* live-pool hint for each swap-fee input */
+  ["col","debt"].forEach(function(leg){
+    const arr=state[leg], btn=$(leg+"-fee-prefill");
+    const syms=arr.map(t=>t.sym).filter(Boolean);
+    if(arr.length>1&&syms.length===2){
+      const live=POOLFEE[syms.slice().sort().join("|")];
+      btn.hidden=false;
+      if(live!=null){ btn.textContent=`↳ a live Fluid ${syms.join("-")} pool trades at ${live.toFixed(2)}% — use it`; btn.dataset.v=live.toFixed(2); }
+      else { btn.textContent=`↳ no live Fluid pool for ${syms.join("-")} — this fee is your estimate`; btn.dataset.v=""; }
+    } else btn.hidden=true;
+  });
+  $("col-hint").textContent  = state.col.length>1 ? "smart collateral — a two-token pool" : "single token";
+  $("debt-hint").textContent = state.debt.length>1 ? "smart debt — a two-token pool" : "single token";
+
+  if(!r.ready){
+    $("apr").textContent="—"; $("apr").className="v";
+    $("apr-sub").textContent="pick a collateral and a debt token to begin";
+    ["s-lev","s-unlev","s-sup","s-bor"].forEach(i=>$(i).textContent="—");
+    $("flags").innerHTML=""; $("ladder").innerHTML=""; $("mathbar").innerHTML="";
+    return;
+  }
+
+  $("apr").textContent=f(r.apr,true);
+  $("apr").className="v "+(r.apr>=0?"pos":"neg");
+  $("apr-sub").innerHTML=`at ${lev} · ${r.n} loop${r.n===1?"":"s"} · CF ${r.cf.toFixed(1)}%`;
+  $("s-lev").textContent=lev;
+  $("s-unlev").textContent=f(r.unlev,true);
+  $("s-unlev").className="v "+(r.unlev>=0?"pos":"neg");
+  $("s-sup").textContent=r.S.toFixed(2)+"%";
+  $("s-bor").textContent=r.B.toFixed(2)+"%";
+
+  const flags=[];
+  if(r.spoke){
+    flags.push(`<div class="flag ok"><span>✓</span><div><b>Live today.</b> The ${r.spoke.hub} / ${r.spoke.spoke} spoke takes this
+      ${r.cols.length>1?"basket":"collateral"} at ${r.cfAuto.toFixed(1)}% collateral factor and lets you borrow
+      ${r.debts.map(d=>d.sym).join(" + ")} against it.</div></div>`);
+  } else {
+    flags.push(`<div class="flag warn"><span>⚠</span><div><b>Not live as one position.</b> ${r.diag.join("; ")}.
+      The numbers below still price it at today's rates${r.cfIsHypo?`, using the best collateral factor each token reaches on any
+      live spoke (${r.cfAuto.toFixed(1)}%)`:""}, but you could not open this in a single Aave v4 spoke right now.</div></div>`);
+  }
+  if(r.isPool.col||r.isPool.debt){
+    flags.push(`<div class="flag warn"><span>⚠</span><div><b>${r.isPool.col&&r.isPool.debt?"Smart collateral and smart debt are":"A two-token pool leg is"} not an Aave v4 primitive yet.</b>
+      That is exactly what the DEX Spoke initiative would add — so the swap-fee figure is your assumption, and no collateral factor
+      is published for a pool used as collateral.</div></div>`);
+  }
+  if(r.spread<0){
+    flags.push(`<div class="flag bad"><span>⚠</span><div><b>Leverage is working against you.</b> Net supply ${r.S.toFixed(2)}% sits below
+      net borrow ${r.B.toFixed(2)}% — a spread of ${sgn(r.spread,2)}%. Every extra loop lowers the result: unlevered pays
+      ${f(r.unlev,true)}, this loop pays ${f(r.apr,true)}.</div></div>`);
+  }
+  if(r.missing.length)
+    flags.push(`<div class="flag bad"><span>⚠</span><div>No live Aave rate found for <b>${r.missing.join(", ")}</b> — treated as 0%.</div></div>`);
+  $("flags").innerHTML=flags.join("");
+
+  const steps=[
+    {k:"native",lbl:"the collateral tokens' own yield", v:r.eng.native, chip:"native"},
+    {k:"fees",  lbl:"swap fees on the pool leg(s)",     v:r.eng.fees,   chip:"fees"},
+    {k:"inc",   lbl:"campaign rewards, while they run", v:r.eng.inc,    chip:"inc"}
+  ].filter(s=>Math.abs(s.v)>=0.005);
+  const nm={base:"Base carry",native:"Native yield",fees:"Swap fees",inc:"Incentive"};
+  const row=(lbl,val,delta,cls,chip)=>`<tr${cls?` class="${cls}"`:""}>
+    <td>${chip?`<span class="chip ${chip}">${nm[chip]}</span>`:""}<span class="ladder-lbl">${lbl}</span></td>
+    <td class="numeric ${val>=0?"pos":"neg"}">${f(val,true)}</td>
+    <td class="numeric" style="color:var(--text-mute)">${delta==null?"":sgn(delta,2)+"pp"}</td></tr>`;
+  let run=r.eng.lend, body=row("lend minus borrow, nothing else", r.eng.lend, null, "", "base");
+  steps.forEach(s=>{ run+=s.v; body+=row(s.lbl, run, s.v, "", s.chip); });
+  body+=row("= your net APR", r.apr, null, "total", "");
+  const flips=steps.filter(s=>(r.apr-s.v<0)!==(r.apr<0));
+  const foot = flips.length===1
+      ? `<b>${nm[flips[0].chip]} alone decides the sign.</b> Remove it and this loop pays ${f(r.apr-flips[0].v,true)}.`
+    : flips.length>1
+      ? `<b>No single engine carries it</b> — removing any one of ${flips.map(s=>nm[s.chip].toLowerCase()).join(" or ")} flips the sign.`
+    : r.eng.lend<0 ? `The lending spread alone is ${f(r.eng.lend,true)}; the engines above carry the rest.`
+    : `Every engine is additive here — none alone is load-bearing for the sign.`;
+  $("ladder").innerHTML=`<div class="ladder">
+    <div class="ladder-h">Where the ${f(r.apr,true)} comes from
+      <span class="ladder-note">each engine added in turn, at ${lev}</span></div>
+    <table><tbody>${body}</tbody></table>
+    <p class="ladder-note" style="display:block;margin-top:9px;line-height:1.55">${foot}</p></div>`;
+
+  $("mathbar").innerHTML=`
+    <div class="mathrow"><span class="sup">Supply ${r.S.toFixed(2)}%</span><span class="op">×</span><span>${r.C.toFixed(2)}</span>
+      <span class="op">−</span><span class="bor">Borrow ${r.B.toFixed(2)}%</span><span class="op">×</span><span>${r.D.toFixed(2)}</span>
+      <span class="op">=</span><span style="font-weight:700;font-size:15px;color:${r.apr>=0?"var(--pos)":"var(--neg)"}">${f(r.apr,true)}</span></div>
+    <div class="mathnote">After ${r.n} loop${r.n===1?"":"s"} at ${r.cf.toFixed(1)}% CF you hold <b>${r.C.toFixed(2)}×</b> your money as
+      collateral against <b>${r.D.toFixed(2)}×</b> as debt — the difference is always exactly 1×, your own equity.
+      Loan-to-value ${r.ltv.toFixed(1)}%, approaching ${r.cf.toFixed(1)}% as loops → ∞.</div>`;
+}
+
+function renderMethod(){
+  $("methodcard").innerHTML=`
+  <div><b>What this computes.</b> The loop identity — the same one the Loop Economics page reconciles against Fluid's own vault
+    pages: <code>Net APR = Supply × C − Borrow × (C−1)</code>. With <b>n</b> loops at collateral factor <b>CF</b> you end up holding
+    <code>C = (1 − CF^(n+1)) / (1 − CF)</code> units of collateral per unit of your own money, and <code>C − 1</code> of debt. As n
+    grows this approaches the familiar ceiling <code>1/(1−CF)</code> — 20× at 95%, 12.5× at 92%, 5× at 80%.</div>
+  <div><b>Where the rates come from.</b> Supply and borrow APYs, collateral factors and borrowable flags are read live from Aave's
+    public API for Ethereum. Collateral factor is <b>spoke-scoped</b>, not hub-wide — wstETH is 95.5% on the Lido spoke but 80% on
+    Main — so the builder resolves the specific spoke that supports your exact combination and uses that spoke's CF, or tells you
+    that no spoke does. Token native yields (staking, funding) come from Fluid's <code>stakingApr</code> and are <b>additive</b> to
+    Aave's supply rate: they accrue in the token's own exchange rate, off Aave's book, which is why Aave itself pays ~0% on wstETH,
+    weETH and sUSDe.</div>
+  <div><b>What you supply.</b> The swap-fee APR on any two-token leg, the number of loops, and any campaign rewards. Swap fees are
+    an input because <b>a DEX pool as collateral or debt is not an Aave v4 primitive today</b> — that is precisely what the DEX Spoke
+    initiative would add. Where a matching Fluid pool exists, the builder offers its current trading APR as a starting point; treat a
+    single reading as noisy and prefer a longer average.</div>
+  <div><b>What it does not model.</b> Impermanent loss on a two-token leg, entry slippage, gas, liquidation, or the price path of any
+    token. A negative carry spread means every extra loop <i>subtracts</i> — the builder flags that case, because a positive headline
+    can still be worse than simply holding the collateral unlevered.</div>`;
+}
+
+document.addEventListener("change",function(e){
+  const t=e.target;
+  if(t.dataset.leg!=null){ state[t.dataset.leg][+t.dataset.i].sym=t.value||null; renderLegs(); render(); }
+  else if(t.dataset.w!=null){ state[t.dataset.w][+t.dataset.i].w=Math.max(1,Math.min(99,+t.value||1)); render(); }
+});
+document.addEventListener("input",function(e){
+  const t=e.target;
+  if(t.id==="loops"){ state.loops=+t.value; $("loops-num").value=t.value; render(); }
+  else if(t.id==="loops-num"){ state.loops=+t.value; $("loops").value=Math.min(40,+t.value||0); render(); }
+  else if(t.id==="cf"){ state.cfAuto=false; state.cf=+t.value; render(); }
+  else if(t.id==="col-fee"){ state.colFee=+t.value; render(); }
+  else if(t.id==="debt-fee"){ state.debtFee=+t.value; render(); }
+  else if(t.id==="sup-inc"){ state.supInc=+t.value; render(); }
+  else if(t.id==="bor-inc"){ state.borInc=+t.value; render(); }
+});
+document.addEventListener("click",function(e){
+  const b=e.target.closest("button"); if(!b) return;
+  if(b.id==="col-add"){ state.col.push({sym:null,w:50}); state.col[0].w=50; renderLegs(); render(); }
+  else if(b.id==="debt-add"){ state.debt.push({sym:null,w:50}); state.debt[0].w=50; renderLegs(); render(); }
+  else if(b.dataset.rm){ const leg=b.dataset.rm; state[leg].splice(+b.dataset.i,1); state[leg][0].w=100;
+    if(leg==="col"){state.colFee=0;} else {state.debtFee=0;}
+    const fi=$(leg+"-fee"); if(fi) fi.value=0; renderLegs(); render(); }
+  else if(b.id==="col-fee-prefill"&&b.dataset.v){ state.colFee=+b.dataset.v; $("col-fee").value=b.dataset.v; render(); }
+  else if(b.id==="debt-fee-prefill"&&b.dataset.v){ state.debtFee=+b.dataset.v; $("debt-fee").value=b.dataset.v; render(); }
+  else if(b.id==="refreshbtn"){ refresh(); }
+});
+
+function paintSources(){
+  const t=SRC.aave.at||SRC.fluid.at||"";
+  const ok=[], bits=[];
+  if(SRC.aave.state==="live") ok.push("Aave v4");
+  if(SRC.fluid.state==="live") ok.push("Fluid");
+  if(ok.length) bits.push(`<span class="src"><span class="sdot live"></span>${ok.join(" · ")} — live ${t}</span>`);
+  [["Aave v4","aave"],["Fluid","fluid"]].forEach(function(p){
+    if(SRC[p[1]].state!=="live")
+      bits.push(`<span class="src"><span class="sdot ${SRC[p[1]].state==="wait"?"wait":"stale"}"></span>${p[0]}: ${SRC[p[1]].state==="wait"?"loading…":"unavailable"}</span>`);
+  });
+  if(SPOKES.length) bits.push(`<span class="src"><span class="sdot live"></span>${SPOKES.length} spokes · ${ALLCOL.length} collateral · ${ALLDEBT.length} borrowable</span>`);
+  $("srcline").innerHTML=bits.join("");
+  $("asof").textContent = ok.length?"live "+t:"unavailable";
+}
+
+async function refresh(){
+  const btn=$("refreshbtn"); btn.disabled=true; btn.classList.add("loading");
+  const t=new Date().toLocaleTimeString("en-US",{hour12:false,hour:"2-digit",minute:"2-digit"});
+  const res=await Promise.allSettled([loadAave(),loadFluid()]);
+  SRC.aave  = res[0].status==="fulfilled"?{state:"live",at:t}:{state:"stale",at:SRC.aave.at};
+  SRC.fluid = res[1].status==="fulfilled"?{state:"live",at:t}:{state:"stale",at:SRC.fluid.at};
+  if(res[0].status==="rejected") console.warn("aave load failed:",res[0].reason);
+  if(res[1].status==="rejected") console.warn("fluid load failed:",res[1].reason);
+  try{ renderLegs(); render(); paintSources(); }
+  catch(err){ console.error("render failed:",err); }
+  finally{ btn.disabled=false; btn.classList.remove("loading"); }
+}
+
+/* boot — open on the canonical wstETH → WETH loop so the page shows something real */
+renderMethod(); renderLegs(); render(); paintSources();
+refresh().then(function(){
+  if(!state.col[0].sym && ALLCOL.indexOf("wstETH")>=0) state.col[0].sym="wstETH";
+  if(!state.debt[0].sym && ALLDEBT.indexOf("WETH")>=0) state.debt[0].sym="WETH";
+  state.cfAuto=true;
+  renderLegs(); render();
+}).catch(console.error);
+</script>
+</body>
+</html>
