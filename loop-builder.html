@@ -89,6 +89,11 @@
   .sdot { width:7px; height:7px; border-radius:50%; display:inline-block; flex:none; }
   .sdot.live { background:var(--pos); } .sdot.stale { background:var(--accent); }
   .sdot.wait { background:var(--slate); opacity:.4; }
+  .notice { display:flex; align-items:center; justify-content:center; gap:14px; flex-wrap:wrap;
+    padding:10px 28px; background:var(--primary-soft); border-bottom:1px solid var(--primary-bord);
+    font-size:12.5px; color:var(--text-dim); }
+  .notice b { color:var(--text); }
+  .notice .btn { height:30px; font-size:12px; padding:0 12px; }
   .shell { max-width:1240px; margin:0 auto; padding:0 28px; }
   section.block { padding:24px 0; border-bottom:1px solid var(--border); }
   section.block:last-of-type { border-bottom:none; }
@@ -266,6 +271,8 @@
   <div class="sources-bar">
     <div class="srcline" id="srcline"><span class="src"><span class="sdot wait"></span>loading Aave v4…</span></div>
   </div>
+
+  <div class="notice" id="notice" hidden></div>
 
   <div class="shell">
     <section class="block">
@@ -528,6 +535,40 @@ function baseRate(leg,sym,hub){
   return {v:leg==="col"?r.supplyApy:r.borrowApy,src:"aave"};
 }
 function isOverridden(leg,sym){ return RATE_OVERRIDE[leg+"|"+sym]!=null||(sym in NAT_OVERRIDE); }
+
+/* Refresh means refresh. A box you edited goes back to the live number when you press it —
+   otherwise the button visibly does nothing on exactly the token you were looking at.
+   Two guards keep that from being destructive:
+     - only rates that HAVE a live source are restored. A native yield nobody publishes
+       (sAVAX — Fluid is Ethereum-only) has nothing to restore to, so clearing it would just
+       blank the box and throw away the only number the page holds. Those are kept.
+     - whatever was replaced is stashed, and one click puts it all back.
+   A failed fetch restores nothing, for the same reason: there is no fresh value to use. */
+let UNDO=null;
+function hasLiveRate(sym){ return Object.keys(RATES).some(function(k){return k.endsWith("|"+sym);}); }
+function restoreLive(aaveOk,fluidOk){
+  const stash={rate:{},nat:{}};
+  if(aaveOk) Object.keys(RATE_OVERRIDE).forEach(function(k){
+    if(hasLiveRate(k.split("|")[1])){ stash.rate[k]=RATE_OVERRIDE[k]; delete RATE_OVERRIDE[k]; } });
+  let kept=0;
+  if(fluidOk) Object.keys(NAT_OVERRIDE).forEach(function(sym){
+    if((sym in NATIVE)||NO_NATIVE.has(sym)){ stash.nat[sym]=NAT_OVERRIDE[sym]; delete NAT_OVERRIDE[sym]; }
+    else kept++; });
+  const n=Object.keys(stash.rate).length+Object.keys(stash.nat).length;
+  UNDO=n?stash:null;
+  return {n:n,kept:kept};
+}
+function paintNotice(res){
+  const el=$("notice"), n=res.n, kept=res.kept;
+  if(!n&&!kept){ el.hidden=true; el.innerHTML=""; return; }
+  el.hidden=false;
+  const parts=[];
+  if(n) parts.push(`<b>${n}</b> rate${n===1?"":"s"} you had edited ${n===1?"is":"are"} back to live`);
+  if(kept) parts.push(`<b>${kept}</b> kept — nothing publishes a value to restore ${kept===1?"it":"them"} to`);
+  el.innerHTML=`<span>${parts.join(" · ")}.</span>`
+    +(n?`<button class="btn ghost" id="undobtn" type="button">Undo — put my numbers back</button>`:"");
+}
+function hideNotice(){ const el=$("notice"); if(el&&!el.hidden){ el.hidden=true; el.innerHTML=""; UNDO=null; } }
 
 const state={ chainId:1, spokeKey:"auto",
               col:[{sym:null,w:100}], debt:[{sym:null,w:100}],
@@ -945,7 +986,9 @@ function renderMethod(){
   <div><b>Every rate on the page is editable.</b> Both boxes under each token — the Aave rate and the native yield — take a number
     of your own, so you can price the rate you expect rather than the one printed this second, or supply a yield nobody publishes.
     An edited box is labelled <i>your supply</i> / <i>your borrow</i> and carries a <b>reset</b> link; an untouched one says where
-    the number came from. Overrides are remembered per token and per side until you reset them, including across a change of hub.</div>
+    the number came from. Edits are held per token <i>and</i> per side — supplying wstETH and borrowing it are independent — and
+    they survive a change of hub. <b>Refresh puts them back to live</b>, since that is what the button is for, with a one-click undo;
+    the exception is a yield nobody publishes, which is kept, because there is no live value to restore it to.</div>
   <div><b>Chain and market matter.</b> Aave v4 runs on Ethereum (Core, Plus, Prime, Global Dollar) and Avalanche (Core). Rates for
     the same token differ sharply between them — GHO borrows at 2.60% on one Ethereum hub and 7.27% on another; USDC ranges 0.81%
     to 4.61% across hubs. Pick a hub/spoke explicitly, or leave it on <b>auto</b> and the builder finds the spoke that supports your
@@ -986,9 +1029,9 @@ document.addEventListener("change",function(e){
 document.addEventListener("input",function(e){
   const t=e.target;
   if(t.dataset.nat!=null){ const v=t.value.trim(); if(v==="") delete NAT_OVERRIDE[t.dataset.nat];
-    else NAT_OVERRIDE[t.dataset.nat]=+v||0; render(); }
+    else NAT_OVERRIDE[t.dataset.nat]=+v||0; hideNotice(); render(); }
   else if(t.dataset.rate!=null){ const v=t.value.trim(); if(v==="") delete RATE_OVERRIDE[t.dataset.rate];
-    else RATE_OVERRIDE[t.dataset.rate]=+v||0; render(); }
+    else RATE_OVERRIDE[t.dataset.rate]=+v||0; hideNotice(); render(); }
   else if(t.id==="lev"){ state.lev=+t.value; $("lev-num").value=(+t.value).toFixed(2); render(); }
   else if(t.id==="lev-num"){ state.lev=Math.max(1,+t.value||1); render(); }
   else if(t.id==="cf"){ state.cfAuto=false; state.cf=+t.value; render(); }
@@ -1008,6 +1051,8 @@ document.addEventListener("click",function(e){
     delete RATE_OVERRIDE[b.dataset.reset]; delete NAT_OVERRIDE[parts[1]]; renderLegs(); render(); }
   else if(b.id==="col-fee-prefill"&&b.dataset.v){ state.colFee=+b.dataset.v; $("col-fee").value=b.dataset.v; render(); }
   else if(b.id==="debt-fee-prefill"&&b.dataset.v){ state.debtFee=+b.dataset.v; $("debt-fee").value=b.dataset.v; render(); }
+  else if(b.id==="undobtn"){ if(UNDO){ Object.assign(RATE_OVERRIDE,UNDO.rate); Object.assign(NAT_OVERRIDE,UNDO.nat); }
+    hideNotice(); renderLegs(); render(); }
   else if(b.id==="refreshbtn"){ refresh(); }
 });
 
@@ -1037,7 +1082,8 @@ async function refresh(){
   SRC.fluid = res[1].status==="fulfilled"?{state:"live",at:t}:{state:"stale",at:SRC.fluid.at};
   if(res[0].status==="rejected") console.warn("aave load failed:",res[0].reason);
   if(res[1].status==="rejected") console.warn("fluid load failed:",res[1].reason);
-  try{ renderMarket(); renderLegs(); render(); paintSources(); }
+  const restored=restoreLive(res[0].status==="fulfilled",res[1].status==="fulfilled");
+  try{ renderMarket(); renderLegs(); render(); paintSources(); paintNotice(restored); }
   catch(err){ console.error("render failed:",err); }
   finally{ btn.disabled=false; btn.classList.remove("loading"); }
 }
