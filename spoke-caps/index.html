@@ -217,6 +217,7 @@
   .row .sym { font-weight: 600; font-size: 13.5px; overflow-wrap: anywhere; min-width: 0; }
   .row .subline { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; min-width: 0; }
   .row .under { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-mute); }
+  .chip.super { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
   .row .buf { font-family: var(--font-mono); font-size: 9.5px; padding: 0 4px; border-radius: 4px;
     border: 1px solid transparent; white-space: nowrap; }
   .row .buf.yes { color: var(--pos); border-color: color-mix(in srgb, var(--pos) 45%, transparent);
@@ -577,7 +578,7 @@ async function discover(h) {
     const ws = wrap[i] || [];
     if (!ws.length || !und[i]) { noWrapper.push({ assetId:i, token }); return; }
     ws.forEach(w => list.push({ symbol:w.symbol, spoke:w.spoke, assetId:i, decimals:dec[i],
-                                underlying:und[i], token, siblings:ws.length }));
+                                underlying:und[i], token }));
   });
   if (!list.length) throw new Error("hub reports " + n + " assets but no wrappers");
   return { list, assetCount:n, noWrapper };
@@ -629,6 +630,18 @@ async function readHub(h) {
     return { ...w, hub:h.key, addCap:capTokens, supplied, available, pct, rate,
              active, halted, uncapped, disabled, buffer, bufU, bufW };
   });
+  /* A count alone cannot be rendered usefully — "1 of 2" is identical on both wrappers and
+     tells you neither which one you are looking at nor what the other is. Attach the actual
+     siblings, with their state, so the badge can say something true. */
+  const byAsset = {};
+  rows.forEach(r => (byAsset[r.assetId] = byAsset[r.assetId] || []).push(r));
+  rows.forEach(r => {
+    r.others = (byAsset[r.assetId] || []).filter(x => x.spoke !== r.spoke).map(x => ({
+      symbol: x.symbol,
+      state: x.error ? "unreadable" : x.disabled ? "closed"
+           : x.halted ? "halted" : !x.active ? "inactive"
+           : x.uncapped ? "uncapped" : "cap " + fmt(x.addCap, x.decimals) }));
+  });
   return { block: parseInt(blockHex, 16), rows, assetCount:d.assetCount, noWrapper:d.noWrapper };
 }
 
@@ -652,6 +665,17 @@ function statusText(r) {
   if (r.pct === null) return { cls:"open", txt:"uncapped" };
   const b = band(r.pct);
   return { cls:b, txt: b === "full" ? "at cap" : b === "filling" ? "filling" : "open" };
+}
+
+/* Says how many OTHER wrappers this same token has on this hub, and names them with their
+   state in the tooltip. The point is to stop one wrapper being read as the whole story for a
+   token — the failure that hid a live 13m waGlobalDollarUSDC behind a closed waPaxosUSDC. */
+function sibBadge(r) {
+  const o = r.others || [];
+  if (!o.length) return "";
+  const list = o.map(x => `${x.symbol} (${x.state})`).join(", ");
+  return `<span class="dupe" title="${r.token} has ${o.length + 1} wrappers on this hub. The other${
+    o.length > 1 ? "s are" : " is"} ${list}.">+${o.length} more for ${r.token}</span>`;
 }
 
 /* Three states, and "unknown" is deliberately distinct from "no" — a failed Vault read must
@@ -687,7 +711,7 @@ function rowHTML(r) {
   return `<div class="row">
     <div class="name"><div class="symline"><span class="sym">${r.symbol}</span>${rateTxt}</div>
       <div class="subline"><span class="under">wraps ${r.token}</span>${
-        r.siblings > 1 ? `<span class="dupe" title="this token has ${r.siblings} wrappers on this hub">1 of ${r.siblings}</span>` : ""}
+        sibBadge(r)}
         ${bufBadge(r)}
         <span class="addr" data-a="${r.spoke}" title="click to copy — ${r.spoke}">${short}</span></div></div>
     <div class="barcell">${bar}</div>
@@ -713,7 +737,10 @@ function hubHTML(h, data) {
                   || (b.addCap||0) - (a.addCap||0));
   const strips =
     (off.length ? `<div class="disabled-strip"><span class="lab">Wrapper live, deposits disabled · cap 0</span>${
-      off.map(r => `<span class="chip" title="wraps ${r.token} — ${r.spoke}">${r.symbol}</span>`).join("")}</div>` : "")
+      off.map(r => { const live = (r.others || []).filter(x => !/closed|halted|inactive|unreadable/.test(x.state));
+        return `<span class="chip${live.length ? " super" : ""}" title="wraps ${r.token} — ${r.spoke}${
+          live.length ? ` — superseded: ${live.map(x => x.symbol).join(", ")} is open for the same token` : ""}">${r.symbol}</span>`;
+      }).join("")}</div>` : "")
     + (data.noWrapper.length ? `<div class="disabled-strip nowrap"><span class="lab">Listed on the hub, no ERC-4626 wrapper deployed</span>${
       data.noWrapper.map(a => `<span class="chip warn">${a.token}</span>`).join("")}</div>` : "");
   return `<section class="block" aria-label="${label} ${h.name}">
@@ -722,7 +749,8 @@ function hubHTML(h, data) {
       <span class="note">block ${data.block.toLocaleString()} · ${data.assetCount} assets · ${
         data.rows.length} wrappers · ${live.filter(depositable).length} depositable · ${off.length} off${
         data.noWrapper.length ? ` · ${data.noWrapper.length} unwrapped` : ""}${
-        data.rows.some(r => r.siblings > 1) ? " · some tokens have two" : ""} · ${
+        (() => { const n = new Set(data.rows.filter(r => (r.others || []).length).map(r => r.token)).size;
+                 return n ? ` · ${n} token${n === 1 ? "" : "s"} with 2 wrappers` : ""; })()} · ${
         data.rows.filter(poolReady).length} pool-ready</span>
     </div>
     <div class="rows">${live.map(rowHTML).join("")}${strips}</div>
