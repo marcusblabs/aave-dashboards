@@ -771,13 +771,17 @@ function paintSources(all, errs, t) {
   const okKeys = Object.keys(all), badKeys = Object.keys(errs);
   const assets = okKeys.reduce((a,k) => a + all[k].assetCount, 0);
   const wrappers = okKeys.reduce((a,k) => a + all[k].rows.length, 0);
+  /* wrappers can exceed assets — three Global Dollar assets carry two each — so these must not
+     be phrased as "N of M", which read as nonsense once the duplicates appeared */
+  const noneYet = okKeys.reduce((a,k) => a + all[k].noWrapper.length, 0);
   const unk = [].concat(...okKeys.map(k => all[k].rows))
     .filter(r => !r.error && depositable(r) && isUnclassified(r)).map(r => r.token);
   document.getElementById("srcline").innerHTML =
     (okKeys.length ? `<span class="src"><span class="sdot live"></span>${okKeys.length} of ${HUBS.length} hubs — live ${t}</span>` : "")
     + badKeys.map(k => { const h = HUBS.find(x => x.key === k);
         return `<span class="src"><span class="sdot err"></span>${CHAINS[h.chain].label} ${h.name} unavailable — ${errs[k]}</span>`; }).join("")
-    + `<span class="src"><span class="sdot live"></span>${assets} assets discovered on chain, ${wrappers} with a wrapper</span>`
+    + `<span class="src"><span class="sdot live"></span>${assets} assets discovered on chain · ${wrappers} wrappers${
+        noneYet ? ` · ${noneYet} asset${noneYet === 1 ? "" : "s"} with none` : ""}</span>`
     + (unk.length ? `<span class="src"><span class="sdot warn"></span>new to this page: ${[...new Set(unk)].join(", ")} — shown in full, but not counted as $-pegged</span>` : "")
     + `<span class="src"><span class="sdot live"></span>${
         [].concat(...okKeys.map(k => all[k].rows)).filter(r => r.buffer === true).length
