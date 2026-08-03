@@ -217,6 +217,12 @@
   .row .sym { font-weight: 600; font-size: 13.5px; overflow-wrap: anywhere; min-width: 0; }
   .row .subline { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; min-width: 0; }
   .row .under { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-mute); }
+  .row .buf { font-family: var(--font-mono); font-size: 9.5px; padding: 0 4px; border-radius: 4px;
+    border: 1px solid transparent; white-space: nowrap; }
+  .row .buf.yes { color: var(--pos); border-color: color-mix(in srgb, var(--pos) 45%, transparent);
+    background: color-mix(in srgb, var(--pos) 10%, transparent); }
+  .row .buf.no { color: var(--text-mute); border-color: var(--border-strong); }
+  .row .buf.unknown { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
   .row .dupe { font-family: var(--font-mono); font-size: 9.5px; color: var(--accent);
     border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
     border-radius: 4px; padding: 0 4px; }
@@ -352,8 +358,8 @@
       <div class="val primary" id="kpi-head">—</div>
       <div class="sub" id="kpi-head-sub">room left on $-pegged wrappers</div>
     </div>
-    <div class="kpi" title="The depositable wrapper closest to its deposit cap">
-      <div class="label">Fullest wrapper</div>
+    <div class="kpi" title="Depositable on Aave AND with an ERC-4626 buffer initialised on the Balancer v3 Vault — usable in a boosted pool end to end">
+      <div class="label">Pool-ready now</div>
       <div class="val" id="kpi-full">—</div>
       <div class="sub" id="kpi-full-sub">—</div>
     </div>
@@ -392,6 +398,14 @@
           wrapper deployed against it — <b>syrupUSDG on Global Dollar is exactly that case today</b>. Those are
           listed under each hub and counted in the <i>Awaiting a wrapper</i> tile rather than quietly dropped,
           because they cannot go into a boosted pool until the wrapper ships.</div>
+        <div><b>Aave saying yes is only half of it.</b> A Balancer v3 boosted pool routes through an
+          <b>ERC-4626 buffer</b> held by the Balancer Vault, and that buffer has to be initialised for a given
+          wrapper before any pool can use it. That is a Balancer-side step which nothing on Aave can report, so
+          the page reads it straight from the v3 Vault at
+          <code>0xbA1333…9ba9</code> — <code>isERC4626BufferInitialized</code> for the flag and
+          <code>getBufferBalance</code> for the depth behind it. Each row is badged <b>buffer live</b> or
+          <b>no buffer</b>, and the <i>Pool-ready now</i> tile counts only wrappers where <b>both</b> sides are
+          true. A Vault read that fails shows <b>buffer ?</b> rather than being reported as absent.</div>
         <div><b>How to read it.</b> Caps are governance-set per hub and per spoke. <b>Available</b> is the room
           left before the cap, as the wrapper itself reports it. Bands: <b>open</b> under 40% filled,
           <b>filling</b> 40–90%, <b>at cap</b> above 90%. A cap of <code>2^40−1</code> shows as
@@ -406,7 +420,7 @@
 </div>
 
 <div class="footer">
-  <span>Read live from all five Aave v4 hubs over public RPC (<a href="https://ethereum-rpc.publicnode.com" target="_blank" rel="noopener">publicnode</a> · <a href="https://api.avax.network/ext/bc/C/rpc" target="_blank" rel="noopener">avax</a>) · not affiliated with Aave · nothing here is financial advice</span>
+  <span>Read live from all five Aave v4 hubs and the Balancer v3 Vault over public RPC (<a href="https://ethereum-rpc.publicnode.com" target="_blank" rel="noopener">publicnode</a> · <a href="https://api.avax.network/ext/bc/C/rpc" target="_blank" rel="noopener">avax</a>) · not affiliated with Aave · nothing here is financial advice</span>
   <span>
     <a href="https://github.com/marcusblabs/aave-dashboards" target="_blank" rel="noopener">View source</a>
     · <a href="../">All dashboards</a>
@@ -454,6 +468,13 @@ const NON_DOLLAR = new Set(["WETH","WETHe","WETH.e","wstETH","weETH","rsETH","ez
   "LBTC","BTCb","BTC.b","tBTC","XAUt","PAXG","AAVE","LINK","WAVAX","sAVAX","EURC","EURe","GBPe"]);
 const isDollar = r => DOLLAR.has(r.token);
 const isUnclassified = r => !DOLLAR.has(r.token) && !NON_DOLLAR.has(r.token) && !/^PT-/.test(r.token);
+
+/* Balancer v3 Vault — same address on both chains, verified to carry code and to answer
+   getVaultExtension()/getVaultAdmin() on each. A boosted pool cannot route through a wrapper
+   until an ERC-4626 buffer for it is initialised here, which is a Balancer-side step that
+   nothing on Aave can tell you about. That is why this column exists. */
+const BAL_VAULT = "0xbA1333333333a1BA1108E8412f11850A5C319bA9";
+const BUF = { init:"0x6844846b", balance:"0x4021fe0f" };  /* isERC4626BufferInitialized(address), getBufferBalance(address) */
 
 const SEL = { config:"0xf701f06e", totalAssets:"0x01e1d114", maxDeposit:"0x402d267d",
               assetCount:"0xa0aead4d", underlyingAndDecimals:"0xde079b57",
@@ -576,9 +597,14 @@ async function readHub(h) {
     [w.spoke, SEL.totalAssets],
     [w.spoke, SEL.maxDeposit + DEAD],
     [w.spoke, SEL.convertToAssets + u256(10 ** shareDec[k])]));
-  const [res, blockHex] = await Promise.all([
+  /* Balancer buffer state is a separate contract, so it gets its own batch. If the Vault
+     read fails the Aave side must still render — buffer becomes null, shown as "unknown"
+     rather than silently as "no buffer", which would be a claim we have not earned. */
+  const [res, blockHex, buf] = await Promise.all([
     rpcBatch(rpcs, calls),
     rpc(rpcs, "eth_blockNumber", []),
+    rpcBatch(rpcs, L.flatMap(w => [[BAL_VAULT, BUF.init + addr(w.spoke)],
+                                   [BAL_VAULT, BUF.balance + addr(w.spoke)]])).catch(() => null),
   ]);
   const rows = L.map((w, k) => {
     const [cfg, ta, md, cv] = res.slice(k * 4, k * 4 + 4);
@@ -593,8 +619,15 @@ async function readHub(h) {
     const disabled = addCap === 0n;
     const rate = cv && cv !== "0x" ? Number(hexNum(cv)) / unit : null;
     const pct = (capTokens && capTokens > 0) ? Math.min(100, 100 * supplied / capTokens) : null;
+    const bi = buf ? buf[k * 2] : null, bb = buf ? buf[k * 2 + 1] : null;
+    const buffer = (bi && bi !== "0x") ? hexNum(bi) === 1n : null;
+    let bufU = null, bufW = null;
+    if (buffer && bb && bb.length >= 2 + 128) {
+      bufU = Number(hexNum("0x" + bb.slice(2, 2 + 64))) / unit;
+      bufW = Number(hexNum("0x" + bb.slice(2 + 64, 2 + 128))) / unit;
+    }
     return { ...w, hub:h.key, addCap:capTokens, supplied, available, pct, rate,
-             active, halted, uncapped, disabled };
+             active, halted, uncapped, disabled, buffer, bufU, bufW };
   });
   return { block: parseInt(blockHex, 16), rows, assetCount:d.assetCount, noWrapper:d.noWrapper };
 }
@@ -608,6 +641,8 @@ function fmt(x, dp) {
 }
 function band(pct) { return pct >= 90 ? "full" : pct >= 40 ? "filling" : "open"; }
 function depositable(r) { return !r.error && !r.disabled && r.active && !r.halted; }
+/* Both sides have to be true: Aave lets you mint the wrapper, and Balancer can route it. */
+function poolReady(r) { return depositable(r) && r.buffer === true; }
 
 function statusText(r) {
   if (r.error) return { cls:"err", txt:"read error" };
@@ -617,6 +652,18 @@ function statusText(r) {
   if (r.pct === null) return { cls:"open", txt:"uncapped" };
   const b = band(r.pct);
   return { cls:b, txt: b === "full" ? "at cap" : b === "filling" ? "filling" : "open" };
+}
+
+/* Three states, and "unknown" is deliberately distinct from "no" — a failed Vault read must
+   not be reported as an absent buffer. */
+function bufBadge(r) {
+  if (r.buffer === null || r.buffer === undefined)
+    return `<span class="buf unknown" title="the Balancer Vault could not be read">buffer ?</span>`;
+  if (!r.buffer)
+    return `<span class="buf no" title="no ERC-4626 buffer on the Balancer v3 Vault — a boosted pool cannot route through this wrapper until one is initialised">no buffer</span>`;
+  const depth = (r.bufU != null && r.bufW != null)
+    ? ` — ${fmt(r.bufU, r.decimals)} ${r.token} + ${fmt(r.bufW, r.decimals)} wrapped` : "";
+  return `<span class="buf yes" title="ERC-4626 buffer initialised on the Balancer v3 Vault${depth}">buffer live</span>`;
 }
 
 function rowHTML(r) {
@@ -641,6 +688,7 @@ function rowHTML(r) {
     <div class="name"><div class="symline"><span class="sym">${r.symbol}</span>${rateTxt}</div>
       <div class="subline"><span class="under">wraps ${r.token}</span>${
         r.siblings > 1 ? `<span class="dupe" title="this token has ${r.siblings} wrappers on this hub">1 of ${r.siblings}</span>` : ""}
+        ${bufBadge(r)}
         <span class="addr" data-a="${r.spoke}" title="click to copy — ${r.spoke}">${short}</span></div></div>
     <div class="barcell">${bar}</div>
     <div class="nums">
@@ -674,7 +722,8 @@ function hubHTML(h, data) {
       <span class="note">block ${data.block.toLocaleString()} · ${data.assetCount} assets · ${
         data.rows.length} wrappers · ${live.filter(depositable).length} depositable · ${off.length} off${
         data.noWrapper.length ? ` · ${data.noWrapper.length} unwrapped` : ""}${
-        data.rows.some(r => r.siblings > 1) ? " · some tokens have two" : ""}</span>
+        data.rows.some(r => r.siblings > 1) ? " · some tokens have two" : ""} · ${
+        data.rows.filter(poolReady).length} pool-ready</span>
     </div>
     <div class="rows">${live.map(rowHTML).join("")}${strips}</div>
   </section>`;
@@ -694,8 +743,7 @@ function paintKPIs(all) {
   const rows = [].concat(...Object.values(all).map(d => d.rows)).filter(r => !r.error);
   const open = rows.filter(depositable);
   const stableAvail = open.filter(isDollar).reduce((a,r) => a + r.available, 0);
-  const capped = open.filter(r => r.pct !== null);
-  const fullest = capped.slice().sort((a,b) => b.pct - a.pct)[0];
+  const ready = rows.filter(poolReady);
   const unwrapped = [].concat(...Object.values(all).map(d => d.noWrapper));
 
   document.getElementById("kpi-live").textContent = open.length;
@@ -707,9 +755,11 @@ function paintKPIs(all) {
     open.filter(isDollar).length + " $-pegged wrappers"
     + (unk.length ? " · " + unk.length + " unclassified, not counted" : "");
   const fEl = document.getElementById("kpi-full");
-  fEl.textContent = fullest ? (fullest.pct >= 99.9 ? "99.99%" : fullest.pct.toFixed(1) + "%") : "—";
-  fEl.className = "val" + (fullest && fullest.pct >= 90 ? " warn" : "");
-  document.getElementById("kpi-full-sub").textContent = fullest ? fullest.symbol : "no capped wrappers";
+  fEl.textContent = ready.length;
+  fEl.className = "val" + (ready.length ? " primary" : " warn");
+  document.getElementById("kpi-full-sub").textContent = ready.length
+    ? ready.map(r => r.token).filter((v,i,a) => a.indexOf(v) === i).join(", ")
+    : "no wrapper has a buffer yet";
   const uEl = document.getElementById("kpi-unwrapped");
   uEl.textContent = unwrapped.length;
   uEl.className = "val" + (unwrapped.length ? " warn" : "");
@@ -729,6 +779,9 @@ function paintSources(all, errs, t) {
         return `<span class="src"><span class="sdot err"></span>${CHAINS[h.chain].label} ${h.name} unavailable — ${errs[k]}</span>`; }).join("")
     + `<span class="src"><span class="sdot live"></span>${assets} assets discovered on chain, ${wrappers} with a wrapper</span>`
     + (unk.length ? `<span class="src"><span class="sdot warn"></span>new to this page: ${[...new Set(unk)].join(", ")} — shown in full, but not counted as $-pegged</span>` : "")
+    + `<span class="src"><span class="sdot live"></span>${
+        [].concat(...okKeys.map(k => all[k].rows)).filter(r => r.buffer === true).length
+      } wrappers have a Balancer v3 buffer</span>`
     + `<span class="src"><span class="sdot live"></span>deposit side only — borrow caps are not shown</span>`;
 }
 
