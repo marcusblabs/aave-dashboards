@@ -162,7 +162,7 @@
   .srcline .src { display: inline-flex; align-items: center; gap: 6px; }
   .srcline .sdot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex: none; }
   .sdot.live { background: var(--pos); } .sdot.stale { background: var(--accent); }
-  .sdot.err  { background: var(--neg); }  .sdot.wait  { background: var(--slate); opacity: .4; }
+  .sdot.err  { background: var(--neg); }  .sdot.warn { background: var(--accent); }  .sdot.wait  { background: var(--slate); opacity: .4; }
 
   /* ============ KPI STRIP ============ */
   .kpi-strip {
@@ -220,8 +220,13 @@
   .capbar .fill { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: var(--radius-sm) 0 0 var(--radius-sm); transition: width .6s cubic-bezier(.4,0,.2,1); }
   .fill.open { background: var(--pos); } .fill.filling { background: var(--accent); } .fill.full { background: var(--neg); }
   .capbar .pct {
-    position: absolute; right: 8px; top: 0; height: 100%; display: flex; align-items: center;
+    position: absolute; right: 5px; top: 50%; transform: translateY(-50%); display: flex; align-items: center;
     font-family: var(--font-mono); font-size: 11px; font-variant-numeric: tabular-nums; color: var(--text-dim);
+    /* Above ~94% the fill runs under this label, and light-grey on the salmon "at cap" fill is
+       unreadable — on exactly the row a reader most wants. A chip in the panel colour keeps the
+       label legible over the track and over any of the three fills, in either theme. */
+    padding: 1px 5px; border-radius: 4px; line-height: 1.35;
+    background: color-mix(in srgb, var(--bg-elev) 84%, transparent);
   }
   .capbar.empty { background: transparent; border: 1px dashed var(--border-strong); }
 
@@ -307,7 +312,7 @@
     <div class="brand">
       <div>
         <h1>Tokenization Spoke Caps</h1>
-        <div class="sub">waCore* ERC-4626 wrapper headroom · Ethereum &amp; Avalanche Core Hubs</div>
+        <div class="sub">waCore* ERC-4626 wrapper headroom · Ethereum &amp; Avalanche Core Hubs · list read from the hub</div>
       </div>
     </div>
     <div class="right">
@@ -364,9 +369,13 @@
           cap of 0 is listed as disabled.</div>
         <div><b>Units.</b> Figures are in native token units, not dollars — stablecoins are ≈&nbsp;$1, but AVAX, BTC
           and ETH are not, so the stablecoin-headroom KPI sums only the $-pegged wrappers.</div>
-        <div><b>Spoke set.</b> The wrapper list is embedded from a hub scan on <b>2026-07-15</b> — a spoke listed
-          after that date will not appear until the list is regenerated with <code>aave_v4_spoke_caps.py</code>.
-          Every number attached to a listed spoke is live. Click any address to copy it.</div>
+        <div><b>Spoke set.</b> Read from the hub on every load, not embedded. The hub is self-describing:
+          <code>getAssetCount()</code>, then <code>getSpokeCount</code> and <code>getSpokeAddress</code> per
+          asset, keeping the single spoke that answers <code>symbol()</code> — the ERC-4626 wrapper. That is
+          four batched <code>eth_call</code>s per chain, so <b>a token listed tomorrow appears here by
+          itself</b>, with its own decimals and asset id. An asset whose wrapper is not deployed yet is
+          counted in the status bar rather than hidden. If discovery fails the page falls back to a built-in
+          list captured 2026-07-15 and says so, in amber, in the status bar. Click any address to copy it.</div>
       </div>
     </section>
   </div>
@@ -388,7 +397,18 @@ const HUBS = {
   avalanche: { hub: "0xd07369fAE4A5BB13c9Ce446B052c7867B1AbDf6e", explorer: "https://snowscan.xyz/address/",
                rpcs: ["https://api.avax.network/ext/bc/C/rpc", "https://avalanche-c-chain-rpc.publicnode.com"], mark: "avax", label: "Avalanche" },
 };
-const SPOKES = {
+/* ---------------------------------------------------------------------------
+   The wrapper list is DISCOVERED from the hub on every load — it is not embedded.
+   The hub is self-describing: getAssetCount() -> getSpokeCount(assetId) ->
+   getSpokeAddress(assetId, i), and exactly one spoke per asset answers symbol(),
+   which is the waCore* ERC-4626 wrapper. Verified 17/17 on Ethereum and 7/7 on
+   Avalanche; four batched eth_calls per chain, about half a second.
+
+   A token listed tomorrow therefore appears by itself. SEED below is ONLY the
+   fallback for when discovery fails, so the page still renders something rather
+   than nothing — the status bar says which of the two it used.
+   --------------------------------------------------------------------------- */
+const SEED = {
   ethereum: [
     {symbol:"waCoreUSDC",spoke:"0x531e90a2376902de8915789fcc1075e3b0c153e7",assetId:5,decimals:6},
     {symbol:"waCoreUSDT",spoke:"0x5ec44a70f309854fe04d495cfe1b5da63dd1cc73",assetId:4,decimals:6},
@@ -418,8 +438,19 @@ const SPOKES = {
     {symbol:"waCoresAVAX",spoke:"0x6c27a7435040b7cc512319d5690beef234dfe76e",assetId:6,decimals:18},
   ],
 };
-const STABLES = new Set(["waCoreUSDC","waCoreUSDT","waCoreUSDG","waCoreGHO","waCorefrxUSD","waCoreRLUSD","waCoreUSDt"]);
-const SEL = { config: "0xf701f06e", totalAssets: "0x01e1d114", maxDeposit: "0x402d267d" };
+/* Pegs are classified on the UNDERLYING symbol, so a newly listed stablecoin is either
+   counted or explicitly flagged as unclassified — never silently dropped from the KPI. */
+const DOLLAR = new Set(["USDC","USDT","USDt","USDS","DAI","GHO","USDG","frxUSD","RLUSD","PYUSD",
+  "USDe","sUSDe","syrupUSDG","USD0","USDL","deUSD"]);
+const NON_DOLLAR = new Set(["WETH","WETHe","WETH.e","wstETH","weETH","rsETH","ezETH","WBTC","cbBTC",
+  "LBTC","BTCb","BTC.b","tBTC","XAUt","PAXG","AAVE","LINK","WAVAX","sAVAX","EURC","EURe","GBPe"]);
+const baseSym = sym => String(sym).replace(/^waCore/, "");
+const isDollar = r => DOLLAR.has(baseSym(r.symbol));
+const isUnclassified = r => !DOLLAR.has(baseSym(r.symbol)) && !NON_DOLLAR.has(baseSym(r.symbol));
+
+const SEL = { config: "0xf701f06e", totalAssets: "0x01e1d114", maxDeposit: "0x402d267d",
+              assetCount: "0xa0aead4d", underlyingAndDecimals: "0xde079b57",
+              spokeCount: "0x58a54078", spokeAt: "0x132a8bea", symbol: "0x95d89b41" };
 const DEAD = "000000000000000000000000000000000000000000000000000000000000dead";
 const MAX_CAP = (1n << 40n) - 1n;
 
@@ -440,6 +471,83 @@ async function rpc(rpcs, method, params) {
   throw new Error(err || "rpc failed");
 }
 const ethCall = (rpcs, to, data) => rpc(rpcs, "eth_call", [{ to, data }, "latest"]);
+
+/* One HTTP round-trip for many eth_calls. Discovery would be ~200 sequential requests
+   otherwise; batched it is four. Falls through the RPC list exactly like rpc() does, and
+   throws if a provider answers with anything other than a JSON-RPC array. */
+async function rpcBatch(rpcs, calls) {
+  if (!calls.length) return [];
+  const body = calls.map((c, i) => ({ jsonrpc:"2.0", id:i, method:"eth_call",
+                                      params:[{ to:c[0], data:c[1] }, "latest"] }));
+  let err;
+  for (const url of rpcs) {
+    try {
+      const r = await fetch(url, { method:"POST", headers:{"Content-Type":"application/json"},
+                                   body: JSON.stringify(body) });
+      const j = await r.json();
+      if (Array.isArray(j)) {
+        const out = new Array(calls.length).fill(null);
+        for (const x of j) if (x && typeof x.id === "number") out[x.id] = x.result || null;
+        return out;
+      }
+      err = (j && j.error && j.error.message) || "provider did not return a batch";
+    } catch (e) { err = String(e); }
+  }
+  throw new Error(err || "rpc batch failed");
+}
+
+/* ABI-decode a returned string. Non-ERC20 spokes revert, so this returning null is the
+   test for "not a wrapper" — it must not throw on garbage. */
+function decodeString(hex) {
+  if (!hex || hex.length < 2 + 128) return null;
+  try {
+    const len = parseInt(hex.slice(2 + 64, 2 + 128), 16);
+    if (!len || len > 64) return null;
+    const body = hex.slice(2 + 128, 2 + 128 + len * 2);
+    if (body.length < len * 2) return null;
+    let out = "";
+    for (let i = 0; i < body.length; i += 2) out += String.fromCharCode(parseInt(body.substr(i, 2), 16));
+    return /^[\x20-\x7e]+$/.test(out) ? out : null;
+  } catch (e) { return null; }
+}
+
+/* Enumerate the hub: every asset, and the one ERC-4626 wrapper registered against it. */
+async function discover(chain) {
+  const { hub, rpcs } = HUBS[chain];
+  const n = Number(BigInt(await ethCall(rpcs, hub, SEL.assetCount)));
+  if (!n || n > 512) throw new Error("implausible asset count " + n);
+  const ids = Array.from({ length:n }, (_, i) => i);
+  const [counts, uds] = await Promise.all([
+    rpcBatch(rpcs, ids.map(i => [hub, SEL.spokeCount + u256(i)])),
+    rpcBatch(rpcs, ids.map(i => [hub, SEL.underlyingAndDecimals + u256(i)])),
+  ]);
+  const pairs = [];
+  ids.forEach((i, k) => {
+    const c = Number(BigInt(counts[k] || "0x0"));
+    for (let j = 0; j < c; j++) pairs.push([i, j]);
+  });
+  const addrs = (await rpcBatch(rpcs, pairs.map(([i, j]) => [hub, SEL.spokeAt + u256(i) + u256(j)])))
+    .map(h => (h && h.length >= 42) ? "0x" + h.slice(-40) : null);
+  const syms = await rpcBatch(rpcs, addrs.map(a => [a || hub, a ? SEL.symbol : SEL.assetCount]));
+  const wrap = {};
+  pairs.forEach(([i], k) => {
+    const a = addrs[k]; if (!a) return;
+    const sym = decodeString(syms[k]); if (!sym) return;
+    if (!wrap[i]) wrap[i] = { symbol:sym, spoke:a };
+  });
+  const list = [], noWrapper = [];
+  ids.forEach((i, k) => {
+    const w = wrap[i];
+    const ud = uds[k] || "";
+    if (!w) { noWrapper.push(i); return; }
+    if (ud.length < 2 + 128) { noWrapper.push(i); return; }
+    list.push({ symbol:w.symbol, spoke:w.spoke, assetId:i,
+                decimals: Number(BigInt("0x" + ud.slice(2 + 64, 2 + 128))),
+                underlying: "0x" + ud.slice(2 + 24, 2 + 64) });
+  });
+  if (!list.length) throw new Error("hub reported " + n + " assets but no wrappers");
+  return { list, assetCount:n, noWrapper };
+}
 
 function fmt(x, dp) {
   if (x === null || x === undefined) return "—";
@@ -471,11 +579,20 @@ async function readSpoke(chain, s) {
 
 async function readChain(chain) {
   const { rpcs } = HUBS[chain];
+  let list, source = "chain", assetCount = null, noWrapper = [];
+  try {
+    const d = await discover(chain);
+    list = d.list; assetCount = d.assetCount; noWrapper = d.noWrapper;
+  } catch (e) {
+    console.warn(chain + ": hub discovery failed, falling back to the built-in list —", e);
+    list = SEED[chain]; source = "seed";
+  }
   const [blockHex, rows] = await Promise.all([
     rpc(rpcs, "eth_blockNumber", []),
-    Promise.all(SPOKES[chain].map(s => readSpoke(chain, s).catch(e => ({ ...s, chain, error: String(e.message||e) })))),
+    Promise.all(list.map(s => readSpoke(chain, s).catch(e => ({ ...s, chain, error: String(e.message||e) })))),
   ]);
-  return { block: parseInt(blockHex, 16), rows };
+  return { block: parseInt(blockHex, 16), rows, source, assetCount, noWrapper,
+           seedCount: SEED[chain].length };
 }
 
 function statusText(r) {
@@ -537,15 +654,17 @@ function chainHTML(chain, data) {
 function paintKPIs(all) {
   const rows = [].concat(...Object.values(all).map(d => d.rows)).filter(r => !r.error);
   const live = rows.filter(r => !r.disabled && r.active && !r.halted);
-  const stableAvail = live.filter(r => STABLES.has(r.symbol)).reduce((a,r) => a + r.available, 0);
+  const stableAvail = live.filter(isDollar).reduce((a,r) => a + r.available, 0);
   const capped = live.filter(r => r.pct !== null);
   const fullest = capped.slice().sort((a,b) => b.pct - a.pct)[0];
   const avg = capped.length ? capped.reduce((a,r) => a + r.pct, 0) / capped.length : null;
 
   document.getElementById("kpi-live").textContent = live.length;
   document.getElementById("kpi-head").textContent = "$" + fmt(stableAvail, 0);
+  const unk = live.filter(isUnclassified);
   document.getElementById("kpi-head-sub").textContent =
-    live.filter(r => STABLES.has(r.symbol)).length + " $-pegged wrappers";
+    live.filter(isDollar).length + " $-pegged wrappers"
+    + (unk.length ? " · " + unk.length + " unclassified, not counted" : "");
   const fEl = document.getElementById("kpi-full");
   fEl.textContent = fullest ? (fullest.pct >= 99.9 ? "99.99%" : fullest.pct.toFixed(1) + "%") : "—";
   fEl.className = "val" + (fullest && fullest.pct >= 90 ? " warn" : "");
@@ -555,14 +674,22 @@ function paintKPIs(all) {
   document.getElementById("kpi-avg-sub").textContent = capped.length + " capped wrappers";
 }
 
-function paintSources(all, errs, t) {
+function paintSources(all, errs, t, notes) {
   /* one clock for the whole bar; a chain only gets its own line when it FAILED */
   const good = Object.keys(HUBS).filter(c => !errs[c]);
   const bad  = Object.keys(HUBS).filter(c => errs[c]);
   document.getElementById("srcline").innerHTML =
     (good.length ? `<span class="src"><span class="sdot live"></span>${good.map(c=>`${HUBS[c].label} block ${all[c].block.toLocaleString()}`).join(" · ")} — live ${t}</span>` : "")
     + bad.map(c => `<span class="src"><span class="sdot err"></span>${HUBS[c].label} unavailable — ${errs[c]}</span>`).join("")
-    + `<span class="src"><span class="sdot live"></span>caps, supply and flags all read live from the hub</span>`;
+    + good.map(c => {
+        const d = all[c];
+        return d.source === "seed"
+          ? `<span class="src"><span class="sdot err"></span>${HUBS[c].label}: hub discovery failed — showing the built-in list of ${d.seedCount}, which may be out of date</span>`
+          : `<span class="src"><span class="sdot live"></span>${HUBS[c].label}: ${d.assetCount} assets on the hub, ${d.rows.length} with a wrapper${
+              d.noWrapper.length ? ` · ${d.noWrapper.length} awaiting one` : ""}</span>`;
+      }).join("")
+    + (notes && notes.length ? `<span class="src"><span class="sdot warn"></span>${notes.join(" · ")}</span>` : "")
+    + `<span class="src"><span class="sdot live"></span>wrapper list and every number read live from the hub</span>`;
 }
 
 let toastTimer;
@@ -595,7 +722,14 @@ async function refresh() {
       Object.keys(all).map(c => chainHTML(c, all[c])).join("") ||
       `<section class="block"><div class="method">Both chains failed to read. Public RPCs rate-limit bursts — press <b>Refresh from chain</b> to retry.</div></section>`;
     paintKPIs(all);
-    paintSources(all, errs, t);
+    /* A token the page cannot peg-classify would otherwise vanish from the stablecoin KPI
+       with no trace. Name it instead. */
+    const unk = [].concat(...Object.values(all).map(d => d.rows))
+      .filter(r => !r.error && isUnclassified(r)).map(r => baseSym(r.symbol));
+    const notes = unk.length
+      ? ["new to this page: " + [...new Set(unk)].join(", ") + " — shown in full, but not counted as $-pegged"]
+      : [];
+    paintSources(all, errs, t, notes);
   } finally {
     btn.classList.remove("loading"); btn.disabled = false;
   }
