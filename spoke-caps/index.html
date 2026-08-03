@@ -162,7 +162,11 @@
   .srcline .src { display: inline-flex; align-items: center; gap: 6px; }
   .srcline .sdot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex: none; }
   .sdot.live { background: var(--pos); } .sdot.stale { background: var(--accent); }
-  .sdot.err  { background: var(--neg); }  .sdot.warn { background: var(--accent); }  .sdot.wait  { background: var(--slate); opacity: .4; }
+  .sdot.err  { background: var(--neg); }  .sdot.warn { background: var(--accent); }
+  .disabled-strip.nowrap { border-top-color: var(--accent); }
+  .chip.warn { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+  .rate { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-mute);
+          background: var(--track); padding: 1px 5px; border-radius: 4px; margin-left: 2px; }  .sdot.wait  { background: var(--slate); opacity: .4; }
 
   /* ============ KPI STRIP ============ */
   .kpi-strip {
@@ -207,7 +211,10 @@
   .row:first-child { border-top: none; }
   .row:hover { background: var(--row-hover); }
   .row .name { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-  .row .sym { font-weight: 600; font-size: 13.5px; }
+  /* Wrapper symbols run long on the non-Core hubs — waPaxosPT_USDG_24SEP2026 is 24 chars —
+     and now share the line with the rate chip. Let the pair wrap instead of pushing the row. */
+  .row .symline { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; min-width: 0; }
+  .row .sym { font-weight: 600; font-size: 13.5px; overflow-wrap: anywhere; min-width: 0; }
   .row .addr {
     font-family: var(--font-mono); font-size: 10.5px; color: var(--text-mute);
     cursor: pointer; width: fit-content; border-bottom: 1px dotted transparent;
@@ -312,7 +319,7 @@
     <div class="brand">
       <div>
         <h1>Tokenization Spoke Caps</h1>
-        <div class="sub">waCore* ERC-4626 wrapper headroom · Ethereum &amp; Avalanche Core Hubs · list read from the hub</div>
+        <div class="sub">ERC-4626 wrapper headroom for Balancer boosted pools · every Aave v4 hub · read from chain</div>
       </div>
     </div>
     <div class="right">
@@ -324,32 +331,31 @@
   <!-- PER-SOURCE FRESHNESS -->
   <div class="sources-bar">
     <div class="srcline" id="srcline">
-      <span class="src"><span class="sdot wait"></span>Ethereum: loading…</span>
-      <span class="src"><span class="sdot wait"></span>Avalanche: loading…</span>
+      <span class="src"><span class="sdot wait"></span>discovering hubs…</span>
     </div>
   </div>
 
   <!-- KPI STRIP -->
   <div class="kpi-strip">
-    <div class="kpi" title="Wrappers that are active, not halted and not cap-zero">
-      <div class="label">Live wrappers</div>
+    <div class="kpi" title="Wrappers you can deposit into right now — cap above zero, active, not halted">
+      <div class="label">Depositable now</div>
       <div class="val" id="kpi-live">—</div>
-      <div class="sub">across Ethereum + Avalanche</div>
+      <div class="sub" id="kpi-live-sub">—</div>
     </div>
     <div class="kpi" title="Room left before the deposit cap on $-pegged wrappers, summed in token units (≈ $1 each)">
       <div class="label">Stablecoin headroom</div>
       <div class="val primary" id="kpi-head">—</div>
       <div class="sub" id="kpi-head-sub">room left on $-pegged wrappers</div>
     </div>
-    <div class="kpi" title="The capped wrapper closest to its deposit cap">
+    <div class="kpi" title="The depositable wrapper closest to its deposit cap">
       <div class="label">Fullest wrapper</div>
       <div class="val" id="kpi-full">—</div>
       <div class="sub" id="kpi-full-sub">—</div>
     </div>
-    <div class="kpi" title="Mean fill across wrappers that have a finite cap set">
-      <div class="label">Avg fill (capped)</div>
-      <div class="val" id="kpi-avg">—</div>
-      <div class="sub" id="kpi-avg-sub">—</div>
+    <div class="kpi" title="Assets listed on a hub with no ERC-4626 wrapper deployed — they cannot go into a boosted pool yet">
+      <div class="label">Awaiting a wrapper</div>
+      <div class="val" id="kpi-unwrapped">—</div>
+      <div class="sub" id="kpi-unwrapped-sub">—</div>
     </div>
   </div>
 
@@ -359,30 +365,43 @@
     <section class="block" aria-label="Method and caveats">
       <div class="block-head"><div class="lhs"><h2>Method &amp; caveats</h2></div></div>
       <div class="method">
-        <div><b>What is read.</b> For each wrapper the page calls <code>getSpokeConfig(assetId, spoke)</code> on the
-          Core Hub for the deposit cap and the active/halted flags, plus <code>totalAssets()</code> and
-          <code>maxDeposit(address)</code> on the ERC-4626 wrapper itself. All three are <code>eth_call</code> at
-          <code>latest</code> over public RPC, in your browser — no backend, no API key.</div>
-        <div><b>How to read it.</b> Caps are governance-set per spoke. <b>Available</b> is the room left before the
-          cap, as the wrapper itself reports it. Bands: <b>open</b> under 40% filled, <b>filling</b> 40–90%,
-          <b>at cap</b> above 90%. A wrapper with a cap of <code>2^40−1</code> is shown as <b>uncapped</b>; one with a
-          cap of 0 is listed as disabled.</div>
-        <div><b>Units.</b> Figures are in native token units, not dollars — stablecoins are ≈&nbsp;$1, but AVAX, BTC
-          and ETH are not, so the stablecoin-headroom KPI sums only the $-pegged wrappers.</div>
-        <div><b>Spoke set.</b> Read from the hub on every load, not embedded. The hub is self-describing:
+        <div><b>What this is for.</b> A Balancer boosted pool holds the <b>ERC-4626 wrapper</b>, not the raw
+          token, so the only question that matters here is whether a wrapper exists and how much room is left
+          to deposit into it. That is the <b>deposit cap</b>. The same on-chain struct carries a borrow cap
+          and it is deliberately not shown — it says nothing about wrapping capacity.</div>
+        <div><b>What is read.</b> For each wrapper the page calls <code>getSpokeConfig(assetId, spoke)</code>
+          on its hub for the deposit cap and the active/halted flags, plus <code>totalAssets()</code>,
+          <code>maxDeposit(address)</code> and <code>convertToAssets()</code> on the wrapper itself — the last
+          giving the <b>×rate</b> beside each symbol, the assets-per-share a boosted pool would price against.
+          All <code>eth_call</code> at <code>latest</code> over public RPC, in your browser, batched — no
+          backend, no API key.</div>
+        <div><b>Every hub, not just Core.</b> Aave v4 runs five hubs: Core, Prime, Plus and Global Dollar on
+          Ethereum, and Core on Avalanche. Their wrappers are named per hub — <code>waCore*</code>,
+          <code>waPrime*</code>, <code>waPlus*</code>, <code>waPaxos*</code>, <code>waGlobalDollar*</code> —
+          so nothing here keys off the prefix.</div>
+        <div><b>Nothing is embedded but the five hub addresses.</b> Each hub describes itself:
           <code>getAssetCount()</code>, then <code>getSpokeCount</code> and <code>getSpokeAddress</code> per
-          asset, keeping the single spoke that answers <code>symbol()</code> — the ERC-4626 wrapper. That is
-          four batched <code>eth_call</code>s per chain, so <b>a token listed tomorrow appears here by
-          itself</b>, with its own decimals and asset id. An asset whose wrapper is not deployed yet is
-          counted in the status bar rather than hidden. If discovery fails the page falls back to a built-in
-          list captured 2026-07-15 and says so, in amber, in the status bar. Click any address to copy it.</div>
+          asset, keeping the one spoke that answers <code>symbol()</code> — the wrapper. A token listed
+          tomorrow appears by itself, with its own decimals and asset id.</div>
+        <div><b>Listed is not the same as wrappable.</b> An asset can be live as collateral on a hub with no
+          wrapper deployed against it — <b>syrupUSDG on Global Dollar is exactly that case today</b>. Those are
+          listed under each hub and counted in the <i>Awaiting a wrapper</i> tile rather than quietly dropped,
+          because they cannot go into a boosted pool until the wrapper ships.</div>
+        <div><b>How to read it.</b> Caps are governance-set per hub and per spoke. <b>Available</b> is the room
+          left before the cap, as the wrapper itself reports it. Bands: <b>open</b> under 40% filled,
+          <b>filling</b> 40–90%, <b>at cap</b> above 90%. A cap of <code>2^40−1</code> shows as
+          <b>uncapped</b>; a cap of 0 means the wrapper is deployed but closed to deposits.</div>
+        <div><b>Units.</b> Figures are in native token units, not dollars — stablecoins are ≈&nbsp;$1, but AVAX,
+          BTC and ETH are not, so the headroom tile sums only the $-pegged wrappers. A token matching neither
+          the dollar nor the non-dollar list is named in the status bar and left out of that total rather than
+          guessed at. Click any address to copy it.</div>
       </div>
     </section>
   </div>
 </div>
 
 <div class="footer">
-  <span>Read live from the Aave v4 Core Hubs over public RPC (<a href="https://ethereum-rpc.publicnode.com" target="_blank" rel="noopener">publicnode</a> · <a href="https://api.avax.network/ext/bc/C/rpc" target="_blank" rel="noopener">avax</a>) · not affiliated with Aave · nothing here is financial advice</span>
+  <span>Read live from all five Aave v4 hubs over public RPC (<a href="https://ethereum-rpc.publicnode.com" target="_blank" rel="noopener">publicnode</a> · <a href="https://api.avax.network/ext/bc/C/rpc" target="_blank" rel="noopener">avax</a>) · not affiliated with Aave · nothing here is financial advice</span>
   <span>
     <a href="https://github.com/marcusblabs/aave-dashboards" target="_blank" rel="noopener">View source</a>
     · <a href="../">All dashboards</a>
@@ -391,71 +410,56 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const HUBS = {
-  ethereum:  { hub: "0xCca852Bc40e560adC3b1Cc58CA5b55638ce826c9", explorer: "https://etherscan.io/address/",
-               rpcs: ["https://ethereum-rpc.publicnode.com", "https://eth.drpc.org"], mark: "eth", label: "Ethereum" },
-  avalanche: { hub: "0xd07369fAE4A5BB13c9Ce446B052c7867B1AbDf6e", explorer: "https://snowscan.xyz/address/",
-               rpcs: ["https://api.avax.network/ext/bc/C/rpc", "https://avalanche-c-chain-rpc.publicnode.com"], mark: "avax", label: "Avalanche" },
-};
-/* ---------------------------------------------------------------------------
-   The wrapper list is DISCOVERED from the hub on every load — it is not embedded.
-   The hub is self-describing: getAssetCount() -> getSpokeCount(assetId) ->
-   getSpokeAddress(assetId, i), and exactly one spoke per asset answers symbol(),
-   which is the waCore* ERC-4626 wrapper. Verified 17/17 on Ethereum and 7/7 on
-   Avalanche; four batched eth_calls per chain, about half a second.
+/* ============================================================================
+   Every Aave v4 hub, every ERC-4626 wrapper, deposit side only.
 
-   A token listed tomorrow therefore appears by itself. SEED below is ONLY the
-   fallback for when discovery fails, so the page still renders something rather
-   than nothing — the status bar says which of the two it used.
-   --------------------------------------------------------------------------- */
-const SEED = {
-  ethereum: [
-    {symbol:"waCoreUSDC",spoke:"0x531e90a2376902de8915789fcc1075e3b0c153e7",assetId:5,decimals:6},
-    {symbol:"waCoreUSDT",spoke:"0x5ec44a70f309854fe04d495cfe1b5da63dd1cc73",assetId:4,decimals:6},
-    {symbol:"waCoreGHO",spoke:"0x58c14a5e061c9bc6926c5b853445290f296c2f7b",assetId:6,decimals:18},
-    {symbol:"waCoreRLUSD",spoke:"0xc8a125ae4275a78aadc53b46ca10566bc9b249e0",assetId:7,decimals:18},
-    {symbol:"waCoreUSDG",spoke:"0xac2435e3c25e8246870d33ce0a26988a46d5db68",assetId:8,decimals:6},
-    {symbol:"waCorefrxUSD",spoke:"0x2226749630775ee20230ad65214fb339087ef30d",assetId:9,decimals:18},
-    {symbol:"waCoreEURC",spoke:"0x6d9e2cdd61caf69af99b275704b6e272c41c6718",assetId:10,decimals:6},
-    {symbol:"waCoreWETH",spoke:"0x7320cf22ac095ba2a2e0a652f77efb836c2e751b",assetId:0,decimals:18},
-    {symbol:"waCoreAAVE",spoke:"0x0a65197b16c5969f92672051c9c9c0c75b369135",assetId:15,decimals:18},
-    {symbol:"waCoreLBTC",spoke:"0x7961f140b570490849db878ae222570ea838799d",assetId:13,decimals:8},
-    {symbol:"waCoreLINK",spoke:"0xe69c2045095c8ab3e2a7d77de2328fae5baf797c",assetId:16,decimals:18},
-    {symbol:"waCoreWBTC",spoke:"0x82a9cc4656784e55ef2e78f704028b5e1bfc1732",assetId:11,decimals:8},
-    {symbol:"waCoreXAUt",spoke:"0x4e712562fcb5337011398b6c630f55b60641cd5e",assetId:14,decimals:6},
-    {symbol:"waCorecbBTC",spoke:"0x33b41b74366f55327d959fff6d6b6fbc2853dbb1",assetId:12,decimals:8},
-    {symbol:"waCorersETH",spoke:"0x45a04ca1a5cbeea4b44356c75edd29b33eb2527a",assetId:3,decimals:18},
-    {symbol:"waCoreweETH",spoke:"0x559cec2c840d9dbb18936afc5e5341d78bfc7cbe",assetId:2,decimals:18},
-    {symbol:"waCorewstETH",spoke:"0xcb0e7da9c635628f6d4827355aeca75ab8d3560f",assetId:1,decimals:18},
-  ],
-  avalanche: [
-    {symbol:"waCoreUSDC",spoke:"0x01d7f7b7ce2123192fecc20bd1caf3e4d9e4c10d",assetId:2,decimals:6},
-    {symbol:"waCoreUSDT",spoke:"0x2e4ba06ff97e10d09fa4f5a270e97301eae729a9",assetId:3,decimals:6},
-    {symbol:"waCoreEURC",spoke:"0x7b538a1840eaf2ed92eeb67ee744ae627335e201",assetId:5,decimals:6},
-    {symbol:"waCoreWAVAX",spoke:"0x1604d602f8a05cba2d8ff5d14de4c3498f15b6b4",assetId:0,decimals:18},
-    {symbol:"waCoreWETHe",spoke:"0xf5c849468318c8d5670020fdb96ae135fed37070",assetId:4,decimals:18},
-    {symbol:"waCoreBTCb",spoke:"0x7cd3ccc737f442050a861ec6b00768ae96b2f58e",assetId:1,decimals:8},
-    {symbol:"waCoresAVAX",spoke:"0x6c27a7435040b7cc512319d5690beef234dfe76e",assetId:6,decimals:18},
-  ],
+   The wrapper is the thing a Balancer boosted pool holds, so the question this
+   page answers is "can I put this token to work, and how much room is left" —
+   which is the deposit cap. Borrow caps live in the same struct (slot 2) and are
+   deliberately not shown; they say nothing about wrapping capacity.
+
+   Nothing is hardcoded but the hub addresses. Each hub describes itself:
+     getAssetCount() -> getSpokeCount(id) -> getSpokeAddress(id, i)
+   and exactly one spoke per asset answers symbol() — that is the wrapper.
+   Verified across all five hubs: 42 wrappers, every one a genuine ERC-4626 whose
+   asset() matches the hub's underlying. An asset with NO wrapper is surfaced
+   rather than dropped: syrupUSDG is listed on Global Dollar and has none, so it
+   cannot go in a boosted pool yet however it reads on Aave's own front end.
+   ============================================================================ */
+const CHAINS = {
+  ethereum:  { label:"Ethereum",  mark:"eth",  explorer:"https://etherscan.io/address/",
+               rpcs:["https://ethereum-rpc.publicnode.com","https://eth.drpc.org"] },
+  avalanche: { label:"Avalanche", mark:"avax", explorer:"https://snowscan.xyz/address/",
+               rpcs:["https://api.avax.network/ext/bc/C/rpc","https://avalanche-c-chain-rpc.publicnode.com"] },
 };
-/* Pegs are classified on the UNDERLYING symbol, so a newly listed stablecoin is either
-   counted or explicitly flagged as unclassified — never silently dropped from the KPI. */
+/* Hub addresses decode out of the Aave API's base64 hub ids as chainId::address. */
+const HUBS = [
+  { key:"eth-core",   chain:"ethereum",  name:"Core",          addr:"0xCca852Bc40e560adC3b1Cc58CA5b55638ce826c9" },
+  { key:"eth-prime",  chain:"ethereum",  name:"Prime",         addr:"0x943827DCA022D0F354a8a8c332dA1e5Eb9f9F931" },
+  { key:"eth-plus",   chain:"ethereum",  name:"Plus",          addr:"0x06002e9c4412CB7814a791eA3666D905871E536A" },
+  { key:"eth-gd",     chain:"ethereum",  name:"Global Dollar", addr:"0x62d63197660c080236193CA60b70E49A08E90368" },
+  { key:"avax-core",  chain:"avalanche", name:"Core",          addr:"0xd07369fAE4A5BB13c9Ce446B052c7867B1AbDf6e" },
+];
+
+/* Peg class is read off the UNDERLYING symbol, so a newly listed stablecoin is either
+   counted in the headroom total or named as unclassified — never silently dropped. */
 const DOLLAR = new Set(["USDC","USDT","USDt","USDS","DAI","GHO","USDG","frxUSD","RLUSD","PYUSD",
   "USDe","sUSDe","syrupUSDG","USD0","USDL","deUSD"]);
 const NON_DOLLAR = new Set(["WETH","WETHe","WETH.e","wstETH","weETH","rsETH","ezETH","WBTC","cbBTC",
   "LBTC","BTCb","BTC.b","tBTC","XAUt","PAXG","AAVE","LINK","WAVAX","sAVAX","EURC","EURe","GBPe"]);
-const baseSym = sym => String(sym).replace(/^waCore/, "");
-const isDollar = r => DOLLAR.has(baseSym(r.symbol));
-const isUnclassified = r => !DOLLAR.has(baseSym(r.symbol)) && !NON_DOLLAR.has(baseSym(r.symbol));
+const isDollar = r => DOLLAR.has(r.token);
+const isUnclassified = r => !DOLLAR.has(r.token) && !NON_DOLLAR.has(r.token) && !/^PT-/.test(r.token);
 
-const SEL = { config: "0xf701f06e", totalAssets: "0x01e1d114", maxDeposit: "0x402d267d",
-              assetCount: "0xa0aead4d", underlyingAndDecimals: "0xde079b57",
-              spokeCount: "0x58a54078", spokeAt: "0x132a8bea", symbol: "0x95d89b41" };
+const SEL = { config:"0xf701f06e", totalAssets:"0x01e1d114", maxDeposit:"0x402d267d",
+              assetCount:"0xa0aead4d", underlyingAndDecimals:"0xde079b57",
+              spokeCount:"0x58a54078", spokeAt:"0x132a8bea", symbol:"0x95d89b41",
+              decimals:"0x313ce567", convertToAssets:"0x07a2d13a" };
 const DEAD = "000000000000000000000000000000000000000000000000000000000000dead";
 const MAX_CAP = (1n << 40n) - 1n;
 
 const u256 = n => BigInt(n).toString(16).padStart(64, "0");
 const addr = a => a.toLowerCase().replace("0x","").padStart(64, "0");
+const hexNum = h => (h && h !== "0x") ? BigInt(h) : 0n;
 
 async function rpc(rpcs, method, params) {
   let err;
@@ -472,9 +476,8 @@ async function rpc(rpcs, method, params) {
 }
 const ethCall = (rpcs, to, data) => rpc(rpcs, "eth_call", [{ to, data }, "latest"]);
 
-/* One HTTP round-trip for many eth_calls. Discovery would be ~200 sequential requests
-   otherwise; batched it is four. Falls through the RPC list exactly like rpc() does, and
-   throws if a provider answers with anything other than a JSON-RPC array. */
+/* One HTTP round-trip for many eth_calls. Discovering five hubs one call at a time would be
+   roughly 500 requests and would trip every public rate limit; batched it is about 30. */
 async function rpcBatch(rpcs, calls) {
   if (!calls.length) return [];
   const body = calls.map((c, i) => ({ jsonrpc:"2.0", id:i, method:"eth_call",
@@ -496,8 +499,8 @@ async function rpcBatch(rpcs, calls) {
   throw new Error(err || "rpc batch failed");
 }
 
-/* ABI-decode a returned string. Non-ERC20 spokes revert, so this returning null is the
-   test for "not a wrapper" — it must not throw on garbage. */
+/* ABI-decode a returned string. Non-ERC20 spokes revert, so this returning null IS the
+   test for "not a wrapper" — it must never throw on garbage. */
 function decodeString(hex) {
   if (!hex || hex.length < 2 + 128) return null;
   try {
@@ -506,47 +509,84 @@ function decodeString(hex) {
     const body = hex.slice(2 + 128, 2 + 128 + len * 2);
     if (body.length < len * 2) return null;
     let out = "";
-    for (let i = 0; i < body.length; i += 2) out += String.fromCharCode(parseInt(body.substr(i, 2), 16));
+    for (let i = 0; i < body.length; i += 2) out += String.fromCharCode(parseInt(body.substr(i,2), 16));
     return /^[\x20-\x7e]+$/.test(out) ? out : null;
   } catch (e) { return null; }
 }
 
-/* Enumerate the hub: every asset, and the one ERC-4626 wrapper registered against it. */
-async function discover(chain) {
-  const { hub, rpcs } = HUBS[chain];
-  const n = Number(BigInt(await ethCall(rpcs, hub, SEL.assetCount)));
+/* Enumerate one hub: every asset, and the single ERC-4626 wrapper registered against it. */
+async function discover(h) {
+  const { rpcs } = CHAINS[h.chain], hub = h.addr;
+  const n = Number(hexNum(await ethCall(rpcs, hub, SEL.assetCount)));
   if (!n || n > 512) throw new Error("implausible asset count " + n);
   const ids = Array.from({ length:n }, (_, i) => i);
   const [counts, uds] = await Promise.all([
     rpcBatch(rpcs, ids.map(i => [hub, SEL.spokeCount + u256(i)])),
     rpcBatch(rpcs, ids.map(i => [hub, SEL.underlyingAndDecimals + u256(i)])),
   ]);
+  const ok  = i => uds[i] && uds[i].length >= 2 + 128;
+  const und = ids.map(i => ok(i) ? "0x" + uds[i].slice(2 + 24, 2 + 64) : null);
+  const dec = ids.map(i => ok(i) ? Number(hexNum("0x" + uds[i].slice(2 + 64, 2 + 128))) : 18);
   const pairs = [];
-  ids.forEach((i, k) => {
-    const c = Number(BigInt(counts[k] || "0x0"));
-    for (let j = 0; j < c; j++) pairs.push([i, j]);
-  });
-  const addrs = (await rpcBatch(rpcs, pairs.map(([i, j]) => [hub, SEL.spokeAt + u256(i) + u256(j)])))
-    .map(h => (h && h.length >= 42) ? "0x" + h.slice(-40) : null);
-  const syms = await rpcBatch(rpcs, addrs.map(a => [a || hub, a ? SEL.symbol : SEL.assetCount]));
+  ids.forEach(i => { const c = Number(hexNum(counts[i])); for (let j = 0; j < c; j++) pairs.push([i, j]); });
+  const spokes = (await rpcBatch(rpcs, pairs.map(([i,j]) => [hub, SEL.spokeAt + u256(i) + u256(j)])))
+    .map(x => (x && x.length >= 42) ? "0x" + x.slice(-40) : null);
+  const [syms, usyms] = await Promise.all([
+    rpcBatch(rpcs, spokes.map(a => [a || hub, a ? SEL.symbol : SEL.assetCount])),
+    rpcBatch(rpcs, und.map(a => [a || hub, a ? SEL.symbol : SEL.assetCount])),
+  ]);
   const wrap = {};
   pairs.forEach(([i], k) => {
-    const a = addrs[k]; if (!a) return;
-    const sym = decodeString(syms[k]); if (!sym) return;
-    if (!wrap[i]) wrap[i] = { symbol:sym, spoke:a };
+    const a = spokes[k]; if (!a) return;
+    const s = decodeString(syms[k]); if (!s) return;
+    if (!wrap[i]) wrap[i] = { spoke:a, symbol:s };
   });
   const list = [], noWrapper = [];
-  ids.forEach((i, k) => {
-    const w = wrap[i];
-    const ud = uds[k] || "";
-    if (!w) { noWrapper.push(i); return; }
-    if (ud.length < 2 + 128) { noWrapper.push(i); return; }
-    list.push({ symbol:w.symbol, spoke:w.spoke, assetId:i,
-                decimals: Number(BigInt("0x" + ud.slice(2 + 64, 2 + 128))),
-                underlying: "0x" + ud.slice(2 + 24, 2 + 64) });
+  ids.forEach(i => {
+    const token = decodeString(usyms[i]) || ("asset " + i);
+    if (!wrap[i] || !und[i]) { noWrapper.push({ assetId:i, token }); return; }
+    list.push({ symbol:wrap[i].symbol, spoke:wrap[i].spoke, assetId:i, decimals:dec[i],
+                underlying:und[i], token });
   });
-  if (!list.length) throw new Error("hub reported " + n + " assets but no wrappers");
+  if (!list.length) throw new Error("hub reports " + n + " assets but no wrappers");
   return { list, assetCount:n, noWrapper };
+}
+
+/* Every read for one hub in two batched rounds: share decimals first, because the
+   exchange rate has to be asked for in the wrapper's own units. */
+async function readHub(h) {
+  const { rpcs } = CHAINS[h.chain], hub = h.addr;
+  const d = await discover(h);
+  const L = d.list;
+  const shareDec = (await rpcBatch(rpcs, L.map(w => [w.spoke, SEL.decimals])))
+    .map((x, k) => { const v = Number(hexNum(x)); return (v > 0 && v <= 36) ? v : L[k].decimals; });
+  const calls = [];
+  L.forEach((w, k) => calls.push(
+    [hub,     SEL.config + u256(w.assetId) + addr(w.spoke)],
+    [w.spoke, SEL.totalAssets],
+    [w.spoke, SEL.maxDeposit + DEAD],
+    [w.spoke, SEL.convertToAssets + u256(10 ** shareDec[k])]));
+  const [res, blockHex] = await Promise.all([
+    rpcBatch(rpcs, calls),
+    rpc(rpcs, "eth_blockNumber", []),
+  ]);
+  const rows = L.map((w, k) => {
+    const [cfg, ta, md, cv] = res.slice(k * 4, k * 4 + 4);
+    if (!cfg || cfg.length < 2 + 5 * 64) return { ...w, hub:h.key, error:"config unreadable" };
+    const word = i => hexNum("0x" + cfg.slice(2 + i * 64, 2 + (i + 1) * 64));
+    const addCap = word(0), active = word(3) === 1n, halted = word(4) === 1n;
+    const unit = 10 ** w.decimals;
+    const supplied = Number(hexNum(ta)) / unit;
+    const available = Number(hexNum(md)) / unit;
+    const uncapped = addCap === MAX_CAP;
+    const capTokens = uncapped ? null : Number(addCap);
+    const disabled = addCap === 0n;
+    const rate = cv && cv !== "0x" ? Number(hexNum(cv)) / unit : null;
+    const pct = (capTokens && capTokens > 0) ? Math.min(100, 100 * supplied / capTokens) : null;
+    return { ...w, hub:h.key, addCap:capTokens, supplied, available, pct, rate,
+             active, halted, uncapped, disabled };
+  });
+  return { block: parseInt(blockHex, 16), rows, assetCount:d.assetCount, noWrapper:d.noWrapper };
 }
 
 function fmt(x, dp) {
@@ -557,43 +597,7 @@ function fmt(x, dp) {
   return x.toLocaleString("en-US", opts);
 }
 function band(pct) { return pct >= 90 ? "full" : pct >= 40 ? "filling" : "open"; }
-
-async function readSpoke(chain, s) {
-  const { hub, rpcs } = HUBS[chain];
-  const [cfg, ta, md] = await Promise.all([
-    ethCall(rpcs, hub, SEL.config + u256(s.assetId) + addr(s.spoke)),
-    ethCall(rpcs, s.spoke, SEL.totalAssets).catch(() => "0x0"),
-    ethCall(rpcs, s.spoke, SEL.maxDeposit + DEAD).catch(() => "0x0"),
-  ]);
-  const w = i => BigInt("0x" + cfg.slice(2 + i*64, 2 + (i+1)*64));
-  const addCap = w(0), active = w(3) === 1n, halted = w(4) === 1n;
-  const unit = 10 ** s.decimals;
-  const supplied = Number(BigInt(ta)) / unit;
-  const available = Number(BigInt(md)) / unit;
-  const uncapped = addCap === MAX_CAP;
-  const capTokens = uncapped ? null : Number(addCap);
-  const disabled = addCap === 0n;
-  const pct = (capTokens && capTokens > 0) ? Math.min(100, 100 * supplied / capTokens) : null;
-  return { ...s, chain, addCap: capTokens, supplied, available, pct, active, halted, uncapped, disabled };
-}
-
-async function readChain(chain) {
-  const { rpcs } = HUBS[chain];
-  let list, source = "chain", assetCount = null, noWrapper = [];
-  try {
-    const d = await discover(chain);
-    list = d.list; assetCount = d.assetCount; noWrapper = d.noWrapper;
-  } catch (e) {
-    console.warn(chain + ": hub discovery failed, falling back to the built-in list —", e);
-    list = SEED[chain]; source = "seed";
-  }
-  const [blockHex, rows] = await Promise.all([
-    rpc(rpcs, "eth_blockNumber", []),
-    Promise.all(list.map(s => readSpoke(chain, s).catch(e => ({ ...s, chain, error: String(e.message||e) })))),
-  ]);
-  return { block: parseInt(blockHex, 16), rows, source, assetCount, noWrapper,
-           seedCount: SEED[chain].length };
-}
+function depositable(r) { return !r.error && !r.disabled && r.active && !r.halted; }
 
 function statusText(r) {
   if (r.error) return { cls:"err", txt:"read error" };
@@ -621,8 +625,9 @@ function rowHTML(r) {
     ? `<div class="capbar empty"><span class="pct">${r.disabled ? "" : "no cap set"}</span></div>`
     : `<div class="capbar"><div class="fill ${b}" style="width:${r.pct.toFixed(2)}%"></div><span class="pct">${pctTxt}</span></div>`;
   const capTxt = r.uncapped ? "uncapped" : "cap " + fmt(r.addCap, r.decimals);
+  const rateTxt = r.rate ? `<span class="rate" title="ERC-4626 exchange rate — assets per share">×${r.rate.toFixed(4)}</span>` : "";
   return `<div class="row">
-    <div class="name"><span class="sym">${r.symbol}</span>
+    <div class="name"><div class="symline"><span class="sym">${r.symbol}</span>${rateTxt}</div>
       <span class="addr" data-a="${r.spoke}" title="click to copy — ${r.spoke}">${short}</span></div>
     <div class="barcell">${bar}</div>
     <div class="nums">
@@ -634,62 +639,77 @@ function rowHTML(r) {
   </div>`;
 }
 
-function chainHTML(chain, data) {
-  const { label, mark } = HUBS[chain];
-  const active = data.rows.filter(r => r.error || !r.disabled);
-  const disabled = data.rows.filter(r => !r.error && r.disabled);
-  active.sort((a,b) => (b.addCap||0) - (a.addCap||0) || (b.supplied - a.supplied));
-  const disabledHTML = disabled.length
-    ? `<div class="disabled-strip"><span class="lab">Disabled · cap 0</span>${disabled.map(r => `<span class="chip">${r.symbol}</span>`).join("")}</div>`
-    : "";
-  return `<section class="block" aria-label="${label}">
+function hubHTML(h, data) {
+  const { label, mark } = CHAINS[h.chain];
+  const live = data.rows.filter(r => r.error || !r.disabled);
+  const off  = data.rows.filter(r => !r.error && r.disabled);
+  live.sort((a,b) => (b.addCap||0) - (a.addCap||0) || (b.supplied - a.supplied));
+  const strips =
+    (off.length ? `<div class="disabled-strip"><span class="lab">Wrapper live, deposits disabled · cap 0</span>${
+      off.map(r => `<span class="chip">${r.symbol}</span>`).join("")}</div>` : "")
+    + (data.noWrapper.length ? `<div class="disabled-strip nowrap"><span class="lab">Listed on the hub, no ERC-4626 wrapper deployed</span>${
+      data.noWrapper.map(a => `<span class="chip warn">${a.token}</span>`).join("")}</div>` : "");
+  return `<section class="block" aria-label="${label} ${h.name}">
     <div class="block-head">
-      <div class="lhs"><span class="mark ${mark}"></span><h2>${label}</h2></div>
-      <span class="note">block ${data.block.toLocaleString()} · ${active.length} live · ${disabled.length} off</span>
+      <div class="lhs"><span class="mark ${mark}"></span><h2>${label} · ${h.name}</h2></div>
+      <span class="note">block ${data.block.toLocaleString()} · ${data.assetCount} assets · ${
+        live.filter(depositable).length} depositable · ${off.length} off${
+        data.noWrapper.length ? ` · ${data.noWrapper.length} unwrapped` : ""}</span>
     </div>
-    <div class="rows">${active.map(rowHTML).join("")}${disabledHTML}</div>
+    <div class="rows">${live.map(rowHTML).join("")}${strips}</div>
+  </section>`;
+}
+
+function hubErrHTML(h, msg) {
+  const { label, mark } = CHAINS[h.chain];
+  return `<section class="block" aria-label="${label} ${h.name}">
+    <div class="block-head"><div class="lhs"><span class="mark ${mark}"></span><h2>${label} · ${h.name}</h2></div>
+      <span class="note">unavailable</span></div>
+    <div class="method">Could not read this hub — ${msg}. Public RPCs rate-limit bursts; press
+      <b>Refresh from chain</b> to retry. Nothing is cached, so no stale numbers are being shown for it.</div>
   </section>`;
 }
 
 function paintKPIs(all) {
   const rows = [].concat(...Object.values(all).map(d => d.rows)).filter(r => !r.error);
-  const live = rows.filter(r => !r.disabled && r.active && !r.halted);
-  const stableAvail = live.filter(isDollar).reduce((a,r) => a + r.available, 0);
-  const capped = live.filter(r => r.pct !== null);
+  const open = rows.filter(depositable);
+  const stableAvail = open.filter(isDollar).reduce((a,r) => a + r.available, 0);
+  const capped = open.filter(r => r.pct !== null);
   const fullest = capped.slice().sort((a,b) => b.pct - a.pct)[0];
-  const avg = capped.length ? capped.reduce((a,r) => a + r.pct, 0) / capped.length : null;
+  const unwrapped = [].concat(...Object.values(all).map(d => d.noWrapper));
 
-  document.getElementById("kpi-live").textContent = live.length;
+  document.getElementById("kpi-live").textContent = open.length;
+  document.getElementById("kpi-live-sub").textContent =
+    "of " + rows.length + " wrappers across " + Object.keys(all).length + " hubs";
   document.getElementById("kpi-head").textContent = "$" + fmt(stableAvail, 0);
-  const unk = live.filter(isUnclassified);
+  const unk = open.filter(isUnclassified);
   document.getElementById("kpi-head-sub").textContent =
-    live.filter(isDollar).length + " $-pegged wrappers"
+    open.filter(isDollar).length + " $-pegged wrappers"
     + (unk.length ? " · " + unk.length + " unclassified, not counted" : "");
   const fEl = document.getElementById("kpi-full");
   fEl.textContent = fullest ? (fullest.pct >= 99.9 ? "99.99%" : fullest.pct.toFixed(1) + "%") : "—";
   fEl.className = "val" + (fullest && fullest.pct >= 90 ? " warn" : "");
-  document.getElementById("kpi-full-sub").textContent =
-    fullest ? fullest.symbol + " · " + HUBS[fullest.chain].label : "no capped wrappers";
-  document.getElementById("kpi-avg").textContent = avg === null ? "—" : avg.toFixed(1) + "%";
-  document.getElementById("kpi-avg-sub").textContent = capped.length + " capped wrappers";
+  document.getElementById("kpi-full-sub").textContent = fullest ? fullest.symbol : "no capped wrappers";
+  const uEl = document.getElementById("kpi-unwrapped");
+  uEl.textContent = unwrapped.length;
+  uEl.className = "val" + (unwrapped.length ? " warn" : "");
+  document.getElementById("kpi-unwrapped-sub").textContent =
+    unwrapped.length ? unwrapped.map(a => a.token).join(", ") + " — cannot be pooled yet" : "every listed asset has one";
 }
 
-function paintSources(all, errs, t, notes) {
-  /* one clock for the whole bar; a chain only gets its own line when it FAILED */
-  const good = Object.keys(HUBS).filter(c => !errs[c]);
-  const bad  = Object.keys(HUBS).filter(c => errs[c]);
+function paintSources(all, errs, t) {
+  const okKeys = Object.keys(all), badKeys = Object.keys(errs);
+  const assets = okKeys.reduce((a,k) => a + all[k].assetCount, 0);
+  const wrappers = okKeys.reduce((a,k) => a + all[k].rows.length, 0);
+  const unk = [].concat(...okKeys.map(k => all[k].rows))
+    .filter(r => !r.error && depositable(r) && isUnclassified(r)).map(r => r.token);
   document.getElementById("srcline").innerHTML =
-    (good.length ? `<span class="src"><span class="sdot live"></span>${good.map(c=>`${HUBS[c].label} block ${all[c].block.toLocaleString()}`).join(" · ")} — live ${t}</span>` : "")
-    + bad.map(c => `<span class="src"><span class="sdot err"></span>${HUBS[c].label} unavailable — ${errs[c]}</span>`).join("")
-    + good.map(c => {
-        const d = all[c];
-        return d.source === "seed"
-          ? `<span class="src"><span class="sdot err"></span>${HUBS[c].label}: hub discovery failed — showing the built-in list of ${d.seedCount}, which may be out of date</span>`
-          : `<span class="src"><span class="sdot live"></span>${HUBS[c].label}: ${d.assetCount} assets on the hub, ${d.rows.length} with a wrapper${
-              d.noWrapper.length ? ` · ${d.noWrapper.length} awaiting one` : ""}</span>`;
-      }).join("")
-    + (notes && notes.length ? `<span class="src"><span class="sdot warn"></span>${notes.join(" · ")}</span>` : "")
-    + `<span class="src"><span class="sdot live"></span>wrapper list and every number read live from the hub</span>`;
+    (okKeys.length ? `<span class="src"><span class="sdot live"></span>${okKeys.length} of ${HUBS.length} hubs — live ${t}</span>` : "")
+    + badKeys.map(k => { const h = HUBS.find(x => x.key === k);
+        return `<span class="src"><span class="sdot err"></span>${CHAINS[h.chain].label} ${h.name} unavailable — ${errs[k]}</span>`; }).join("")
+    + `<span class="src"><span class="sdot live"></span>${assets} assets discovered on chain, ${wrappers} with a wrapper</span>`
+    + (unk.length ? `<span class="src"><span class="sdot warn"></span>new to this page: ${[...new Set(unk)].join(", ")} — shown in full, but not counted as $-pegged</span>` : "")
+    + `<span class="src"><span class="sdot live"></span>deposit side only — borrow caps are not shown</span>`;
 }
 
 let toastTimer;
@@ -703,33 +723,22 @@ document.addEventListener("click", e => {
   if (a) navigator.clipboard.writeText(a.dataset.a).then(() => toast("Address copied")).catch(()=>{});
 });
 
-/* Theme: bootstrap is the blocking script in <head>; the toggle handler is delegated
-   from nav.js so all three pages share one implementation. */
-
 const btn = document.getElementById("refreshbtn");
 async function refresh() {
   btn.classList.add("loading"); btn.disabled = true;
   try {
-    const settled = await Promise.allSettled(Object.keys(HUBS).map(c => readChain(c)));
+    const settled = await Promise.allSettled(HUBS.map(readHub));
     const all = {}, errs = {};
-    Object.keys(HUBS).forEach((c, i) => {
+    HUBS.forEach((h, i) => {
       const s = settled[i];
-      if (s.status === "fulfilled") all[c] = s.value;
-      else errs[c] = String((s.reason && s.reason.message) || s.reason);
+      if (s.status === "fulfilled") all[h.key] = s.value;
+      else errs[h.key] = String((s.reason && s.reason.message) || s.reason);
     });
-    const t = new Date().toLocaleTimeString("en-US", { hour12:false, hour:"2-digit", minute:"2-digit" });
     document.getElementById("chains").innerHTML =
-      Object.keys(all).map(c => chainHTML(c, all[c])).join("") ||
-      `<section class="block"><div class="method">Both chains failed to read. Public RPCs rate-limit bursts — press <b>Refresh from chain</b> to retry.</div></section>`;
-    paintKPIs(all);
-    /* A token the page cannot peg-classify would otherwise vanish from the stablecoin KPI
-       with no trace. Name it instead. */
-    const unk = [].concat(...Object.values(all).map(d => d.rows))
-      .filter(r => !r.error && isUnclassified(r)).map(r => baseSym(r.symbol));
-    const notes = unk.length
-      ? ["new to this page: " + [...new Set(unk)].join(", ") + " — shown in full, but not counted as $-pegged"]
-      : [];
-    paintSources(all, errs, t, notes);
+      HUBS.map(h => all[h.key] ? hubHTML(h, all[h.key]) : hubErrHTML(h, errs[h.key])).join("");
+    const t = new Date().toLocaleTimeString("en-US", { hour12:false, hour:"2-digit", minute:"2-digit" });
+    if (Object.keys(all).length) paintKPIs(all);
+    paintSources(all, errs, t);
   } finally {
     btn.classList.remove("loading"); btn.disabled = false;
   }
