@@ -215,6 +215,11 @@
      and now share the line with the rate chip. Let the pair wrap instead of pushing the row. */
   .row .symline { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; min-width: 0; }
   .row .sym { font-weight: 600; font-size: 13.5px; overflow-wrap: anywhere; min-width: 0; }
+  .row .subline { display: flex; align-items: baseline; gap: 7px; flex-wrap: wrap; min-width: 0; }
+  .row .under { font-family: var(--font-mono); font-size: 10.5px; color: var(--text-mute); }
+  .row .dupe { font-family: var(--font-mono); font-size: 9.5px; color: var(--accent);
+    border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+    border-radius: 4px; padding: 0 4px; }
   .row .addr {
     font-family: var(--font-mono); font-size: 10.5px; color: var(--text-mute);
     cursor: pointer; width: fit-content; border-bottom: 1px dotted transparent;
@@ -535,18 +540,23 @@ async function discover(h) {
     rpcBatch(rpcs, spokes.map(a => [a || hub, a ? SEL.symbol : SEL.assetCount])),
     rpcBatch(rpcs, und.map(a => [a || hub, a ? SEL.symbol : SEL.assetCount])),
   ]);
+  /* An asset can carry MORE THAN ONE wrapper, and keeping only the first is not a
+     harmless simplification — on the Global Dollar hub, USDC and USDT each have a closed
+     waPaxos* wrapper listed ahead of a live waGlobalDollar* one, so "first" was the wrong
+     one twice over and hid 26m of capacity. Every wrapper gets its own row. */
   const wrap = {};
   pairs.forEach(([i], k) => {
     const a = spokes[k]; if (!a) return;
     const s = decodeString(syms[k]); if (!s) return;
-    if (!wrap[i]) wrap[i] = { spoke:a, symbol:s };
+    (wrap[i] = wrap[i] || []).push({ spoke:a, symbol:s });
   });
   const list = [], noWrapper = [];
   ids.forEach(i => {
     const token = decodeString(usyms[i]) || ("asset " + i);
-    if (!wrap[i] || !und[i]) { noWrapper.push({ assetId:i, token }); return; }
-    list.push({ symbol:wrap[i].symbol, spoke:wrap[i].spoke, assetId:i, decimals:dec[i],
-                underlying:und[i], token });
+    const ws = wrap[i] || [];
+    if (!ws.length || !und[i]) { noWrapper.push({ assetId:i, token }); return; }
+    ws.forEach(w => list.push({ symbol:w.symbol, spoke:w.spoke, assetId:i, decimals:dec[i],
+                                underlying:und[i], token, siblings:ws.length }));
   });
   if (!list.length) throw new Error("hub reports " + n + " assets but no wrappers");
   return { list, assetCount:n, noWrapper };
@@ -613,8 +623,9 @@ function rowHTML(r) {
   const short = r.spoke.slice(0,6) + "…" + r.spoke.slice(-4);
   const st = statusText(r);
   if (r.error) {
-    return `<div class="row"><div class="name"><span class="sym">${r.symbol}</span>
-      <span class="addr" data-a="${r.spoke}" title="${r.spoke}">${short}</span></div>
+    return `<div class="row"><div class="name"><div class="symline"><span class="sym">${r.symbol}</span></div>
+      <div class="subline"><span class="under">wraps ${r.token}</span>
+        <span class="addr" data-a="${r.spoke}" title="${r.spoke}">${short}</span></div></div>
       <div class="barcell"><div class="capbar empty"></div></div>
       <div class="nums"><div class="cap">${r.error}</div></div>
       <span class="pill err">error</span></div>`;
@@ -628,7 +639,9 @@ function rowHTML(r) {
   const rateTxt = r.rate ? `<span class="rate" title="ERC-4626 exchange rate — assets per share">×${r.rate.toFixed(4)}</span>` : "";
   return `<div class="row">
     <div class="name"><div class="symline"><span class="sym">${r.symbol}</span>${rateTxt}</div>
-      <span class="addr" data-a="${r.spoke}" title="click to copy — ${r.spoke}">${short}</span></div>
+      <div class="subline"><span class="under">wraps ${r.token}</span>${
+        r.siblings > 1 ? `<span class="dupe" title="this token has ${r.siblings} wrappers on this hub">1 of ${r.siblings}</span>` : ""}
+        <span class="addr" data-a="${r.spoke}" title="click to copy — ${r.spoke}">${short}</span></div></div>
     <div class="barcell">${bar}</div>
     <div class="nums">
       <div class="supplied">${fmt(r.supplied, r.decimals)}</div>
@@ -643,18 +656,25 @@ function hubHTML(h, data) {
   const { label, mark } = CHAINS[h.chain];
   const live = data.rows.filter(r => r.error || !r.disabled);
   const off  = data.rows.filter(r => !r.error && r.disabled);
-  live.sort((a,b) => (b.addCap||0) - (a.addCap||0) || (b.supplied - a.supplied));
+  /* group by underlying first, so a token's two wrappers are always adjacent and the
+     live one cannot be read as the whole story */
+  const rank = {};
+  live.forEach(r => { rank[r.token] = Math.max(rank[r.token] || 0, r.addCap || 0); });
+  live.sort((a,b) => (rank[b.token] - rank[a.token])
+                  || a.token.localeCompare(b.token)
+                  || (b.addCap||0) - (a.addCap||0));
   const strips =
     (off.length ? `<div class="disabled-strip"><span class="lab">Wrapper live, deposits disabled · cap 0</span>${
-      off.map(r => `<span class="chip">${r.symbol}</span>`).join("")}</div>` : "")
+      off.map(r => `<span class="chip" title="wraps ${r.token} — ${r.spoke}">${r.symbol}</span>`).join("")}</div>` : "")
     + (data.noWrapper.length ? `<div class="disabled-strip nowrap"><span class="lab">Listed on the hub, no ERC-4626 wrapper deployed</span>${
       data.noWrapper.map(a => `<span class="chip warn">${a.token}</span>`).join("")}</div>` : "");
   return `<section class="block" aria-label="${label} ${h.name}">
     <div class="block-head">
       <div class="lhs"><span class="mark ${mark}"></span><h2>${label} · ${h.name}</h2></div>
       <span class="note">block ${data.block.toLocaleString()} · ${data.assetCount} assets · ${
-        live.filter(depositable).length} depositable · ${off.length} off${
-        data.noWrapper.length ? ` · ${data.noWrapper.length} unwrapped` : ""}</span>
+        data.rows.length} wrappers · ${live.filter(depositable).length} depositable · ${off.length} off${
+        data.noWrapper.length ? ` · ${data.noWrapper.length} unwrapped` : ""}${
+        data.rows.some(r => r.siblings > 1) ? " · some tokens have two" : ""}</span>
     </div>
     <div class="rows">${live.map(rowHTML).join("")}${strips}</div>
   </section>`;
