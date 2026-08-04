@@ -447,10 +447,14 @@
    cannot go in a boosted pool yet however it reads on Aave's own front end.
    ============================================================================ */
 const CHAINS = {
+  /* Several providers per chain, because one free endpoint throttles a page that asks this
+     many questions. Failed calls are retried against the next in the list before giving up. */
   ethereum:  { label:"Ethereum",  mark:"eth",  explorer:"https://etherscan.io/address/",
-               rpcs:["https://ethereum-rpc.publicnode.com","https://eth.drpc.org"] },
+               rpcs:["https://ethereum-rpc.publicnode.com","https://eth.llamarpc.com",
+                     "https://eth.drpc.org","https://rpc.ankr.com/eth","https://cloudflare-eth.com"] },
   avalanche: { label:"Avalanche", mark:"avax", explorer:"https://snowscan.xyz/address/",
-               rpcs:["https://api.avax.network/ext/bc/C/rpc","https://avalanche-c-chain-rpc.publicnode.com"] },
+               rpcs:["https://api.avax.network/ext/bc/C/rpc","https://avalanche-c-chain-rpc.publicnode.com",
+                     "https://avalanche.drpc.org","https://rpc.ankr.com/avalanche"] },
 };
 /* Hub addresses decode out of the Aave API's base64 hub ids as chainId::address. */
 const HUBS = [
@@ -488,43 +492,105 @@ const u256 = n => BigInt(n).toString(16).padStart(64, "0");
 const addr = a => a.toLowerCase().replace("0x","").padStart(64, "0");
 const hexNum = h => (h && h !== "0x") ? BigInt(h) : 0n;
 
-async function rpc(rpcs, method, params) {
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const RPC_CHUNK = 40;      /* large enough to halve the request count, small enough to be accepted */
+const RPC_TRIES = 3;
+const HUB_BUDGET_MS = 18000;
+/* Retries are per batch and a hub issues many of them, so the budget multiplies: under heavy
+   throttling the page would grind for minutes with a spinner. A deadline per hub bounds that —
+   give up, say so, and let the reader press refresh, rather than hang pretending to work. */
+const budget = ms => ({ until: Date.now() + ms });
+const expired = ctx => !!(ctx && Date.now() > ctx.until);
+
+async function rpc(rpcs, method, params, ctx) {
   let err;
-  for (const url of rpcs) {
-    try {
-      const r = await fetch(url, { method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ jsonrpc:"2.0", id:1, method, params }) });
-      const j = await r.json();
-      if (j.result !== undefined) return j.result;
-      err = j.error && j.error.message;
-    } catch (e) { err = String(e); }
+  for (let attempt = 0; attempt < RPC_TRIES; attempt++) {
+    if (expired(ctx)) throw new Error(err ? err + " (gave up after " + (HUB_BUDGET_MS/1000) + "s)" : "timed out");
+    for (const url of rpcs) {
+      try {
+        const r = await fetch(url, { method:"POST", headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({ jsonrpc:"2.0", id:1, method, params }) });
+        if (!r.ok) { err = "HTTP " + r.status; continue; }
+        const j = await r.json();
+        if (j.result !== undefined) return j.result;
+        err = j.error && j.error.message;
+      } catch (e) { err = String(e.message || e); }
+    }
+    await sleep(Math.min(1200, 250 * Math.pow(2, attempt)));
   }
   throw new Error(err || "rpc failed");
 }
+
 const ethCall = (rpcs, to, data) => rpc(rpcs, "eth_call", [{ to, data }, "latest"]);
 
-/* One HTTP round-trip for many eth_calls. Discovering five hubs one call at a time would be
-   roughly 500 requests and would trip every public rate limit; batched it is about 30. */
-async function rpcBatch(rpcs, calls) {
-  if (!calls.length) return [];
+/* One HTTP round-trip for many eth_calls.
+
+   The critical part is the RETURN SHAPE. A contract that reverts and an RPC that throttles
+   both used to arrive here as null, which made them indistinguishable — so a rate-limited
+   batch of symbol() calls read as "none of these spokes is an ERC-20" and the page reported
+   "17 assets but no wrappers" as though it were a fact about the hub. Reverts are a definitive
+   answer (JSON-RPC code 3); everything else is a transport failure and must be retried, then
+   raised. Each call comes back as {value} or {reverted:true} — never a bare null. */
+async function rpcBatchRaw(url, calls) {
   const body = calls.map((c, i) => ({ jsonrpc:"2.0", id:i, method:"eth_call",
                                       params:[{ to:c[0], data:c[1] }, "latest"] }));
-  let err;
-  for (const url of rpcs) {
-    try {
-      const r = await fetch(url, { method:"POST", headers:{"Content-Type":"application/json"},
-                                   body: JSON.stringify(body) });
-      const j = await r.json();
-      if (Array.isArray(j)) {
-        const out = new Array(calls.length).fill(null);
-        for (const x of j) if (x && typeof x.id === "number") out[x.id] = x.result || null;
-        return out;
-      }
-      err = (j && j.error && j.error.message) || "provider did not return a batch";
-    } catch (e) { err = String(e); }
+  const r = await fetch(url, { method:"POST", headers:{"Content-Type":"application/json"},
+                               body: JSON.stringify(body) });
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  const j = await r.json();
+  if (!Array.isArray(j)) throw new Error((j && j.error && j.error.message) || "provider did not return a batch");
+  const out = new Array(calls.length).fill(null);
+  for (const x of j) {
+    if (!x || typeof x.id !== "number" || x.id >= out.length) continue;
+    if (x.error) {
+      const revert = x.error.code === 3 || /revert/i.test(x.error.message || "");
+      out[x.id] = revert ? { reverted:true } : { failed: x.error.message || ("rpc code " + x.error.code) };
+    } else out[x.id] = { value: x.result };
   }
-  throw new Error(err || "rpc batch failed");
+  for (let i = 0; i < out.length; i++) if (out[i] === null) out[i] = { failed:"no response for this call" };
+  return out;
 }
+
+/* Chunks, rotates providers, and retries ONLY the calls still outstanding. Throws if anything
+   is still unresolved — a partial read must never be presented as a complete one. */
+async function rpcBatch(rpcs, calls, ctx) {
+  const out = new Array(calls.length).fill(null);
+  let pending = calls.map((_, i) => i), lastErr = null;
+  for (let attempt = 0; attempt < RPC_TRIES && pending.length; attempt++) {
+    for (const url of rpcs) {
+      if (!pending.length || expired(ctx)) break;
+      /* Chunks are independent, so they go out together. Sending them one after another kept
+         the bodies small but made a clean load ten times slower — roughly 36 sequential
+         round-trips per hub. Small bodies AND concurrency is the combination that works. */
+      const chunks = [];
+      for (let s = 0; s < pending.length; s += RPC_CHUNK) chunks.push(pending.slice(s, s + RPC_CHUNK));
+      const done = await Promise.all(chunks.map(async idx => {
+        try { return { idx, res: await rpcBatchRaw(url, idx.map(i => calls[i])) }; }
+        catch (e) { lastErr = String(e.message || e); return { idx, res: null }; }
+      }));
+      const next = [];
+      for (const { idx, res } of done) {
+        if (!res) { next.push(...idx); continue; }
+        idx.forEach((i, k) => {
+          const r = res[k];
+          if (r.failed) { next.push(i); lastErr = r.failed; } else out[i] = r;
+        });
+      }
+      pending = next;
+    }
+    if (pending.length && !expired(ctx)) await sleep(Math.min(1200, 300 * Math.pow(2, attempt)));
+  }
+  if (pending.length) throw new Error(pending.length + " of " + calls.length + " calls unanswered — "
+    + (lastErr || "rpc unavailable") + (expired(ctx) ? "; gave up after " + (HUB_BUDGET_MS / 1000) + "s" : ""));
+  /* Contract: every slot is filled. A surviving hole would be read by val() as a revert, which
+     is precisely the confusion this layer exists to prevent, so raise instead of returning it. */
+  const holes = out.reduce((a, x, i) => x === null ? a.concat(i) : a, []);
+  if (holes.length) throw new Error(holes.length + " of " + calls.length + " calls returned nothing");
+  return out;
+}
+
+/* value of a batch entry; null means the call legitimately reverted */
+const val = r => (r && r.value !== undefined) ? r.value : null;
 
 /* ABI-decode a returned string. Non-ERC20 spokes revert, so this returning null IS the
    test for "not a wrapper" — it must never throw on garbage. */
@@ -541,26 +607,44 @@ function decodeString(hex) {
   } catch (e) { return null; }
 }
 
+/* Structure — which assets exist and which wrapper sits on each — changes only on a governance
+   action, while caps and balances change every block. Re-enumerating all of it on every refresh
+   is what pushed this page into rate limits: the spoke-address, symbol and underlying-symbol
+   batches are about 340 of the roughly 400 calls a refresh makes.
+
+   So the structure is cached and REVALIDATED rather than trusted: a refresh re-reads the asset
+   count and the per-asset spoke counts, both cheap, and only rebuilds if either moved. A new
+   wrapper cannot appear without becoming a new spoke, so a stale list cannot survive one —
+   which matters, because a second wrapper appearing on an existing asset is exactly how
+   waGlobalDollarUSDC showed up. */
+const DISCOVERED = {};
+
 /* Enumerate one hub: every asset, and the single ERC-4626 wrapper registered against it. */
-async function discover(h) {
+async function discover(h, ctx) {
   const { rpcs } = CHAINS[h.chain], hub = h.addr;
-  const n = Number(hexNum(await ethCall(rpcs, hub, SEL.assetCount)));
+  const n = Number(hexNum(await rpc(rpcs, "eth_call", [{ to:hub, data:SEL.assetCount }, "latest"], ctx)));
   if (!n || n > 512) throw new Error("implausible asset count " + n);
   const ids = Array.from({ length:n }, (_, i) => i);
-  const [counts, uds] = await Promise.all([
-    rpcBatch(rpcs, ids.map(i => [hub, SEL.spokeCount + u256(i)])),
-    rpcBatch(rpcs, ids.map(i => [hub, SEL.underlyingAndDecimals + u256(i)])),
-  ]);
-  const ok  = i => uds[i] && uds[i].length >= 2 + 128;
-  const und = ids.map(i => ok(i) ? "0x" + uds[i].slice(2 + 24, 2 + 64) : null);
-  const dec = ids.map(i => ok(i) ? Number(hexNum("0x" + uds[i].slice(2 + 64, 2 + 128))) : 18);
+  /* Spoke counts validate the cache; underlyings are only needed when rebuilding, so they are
+     fetched after the cache check rather than on every refresh. */
+  const counts = await rpcBatch(rpcs, ids.map(i => [hub, SEL.spokeCount + u256(i)]), ctx);
+  const shape = n + ":" + ids.map(i => Number(hexNum(val(counts[i])))).join(",");
+  const cached = DISCOVERED[h.key];
+  if (cached && cached.shape === shape) return cached;
+
+  /* Cache missed, so rebuild: everything below runs only when the hub's structure moved. */
+  const uds = await rpcBatch(rpcs, ids.map(i => [hub, SEL.underlyingAndDecimals + u256(i)]), ctx);
+  const ok  = i => val(uds[i]) && val(uds[i]).length >= 2 + 128;
+  const und = ids.map(i => ok(i) ? "0x" + val(uds[i]).slice(2 + 24, 2 + 64) : null);
+  const dec = ids.map(i => ok(i) ? Number(hexNum("0x" + val(uds[i]).slice(2 + 64, 2 + 128))) : 18);
+
   const pairs = [];
-  ids.forEach(i => { const c = Number(hexNum(counts[i])); for (let j = 0; j < c; j++) pairs.push([i, j]); });
-  const spokes = (await rpcBatch(rpcs, pairs.map(([i,j]) => [hub, SEL.spokeAt + u256(i) + u256(j)])))
-    .map(x => (x && x.length >= 42) ? "0x" + x.slice(-40) : null);
+  ids.forEach(i => { const c = Number(hexNum(val(counts[i]))); for (let j = 0; j < c; j++) pairs.push([i, j]); });
+  const spokes = (await rpcBatch(rpcs, pairs.map(([i,j]) => [hub, SEL.spokeAt + u256(i) + u256(j)]), ctx))
+    .map(x => (val(x) && val(x).length >= 42) ? "0x" + val(x).slice(-40) : null);
   const [syms, usyms] = await Promise.all([
-    rpcBatch(rpcs, spokes.map(a => [a || hub, a ? SEL.symbol : SEL.assetCount])),
-    rpcBatch(rpcs, und.map(a => [a || hub, a ? SEL.symbol : SEL.assetCount])),
+    rpcBatch(rpcs, spokes.map(a => [a || hub, a ? SEL.symbol : SEL.assetCount]), ctx),
+    rpcBatch(rpcs, und.map(a => [a || hub, a ? SEL.symbol : SEL.assetCount]), ctx),
   ]);
   /* An asset can carry MORE THAN ONE wrapper, and keeping only the first is not a
      harmless simplification — on the Global Dollar hub, USDC and USDT each have a closed
@@ -569,29 +653,35 @@ async function discover(h) {
   const wrap = {};
   pairs.forEach(([i], k) => {
     const a = spokes[k]; if (!a) return;
-    const s = decodeString(syms[k]); if (!s) return;
+    const s = decodeString(val(syms[k])); if (!s) return;
     (wrap[i] = wrap[i] || []).push({ spoke:a, symbol:s });
   });
   const list = [], noWrapper = [];
   ids.forEach(i => {
-    const token = decodeString(usyms[i]) || ("asset " + i);
+    const token = decodeString(val(usyms[i])) || ("asset " + i);
     const ws = wrap[i] || [];
     if (!ws.length || !und[i]) { noWrapper.push({ assetId:i, token }); return; }
     ws.forEach(w => list.push({ symbol:w.symbol, spoke:w.spoke, assetId:i, decimals:dec[i],
                                 underlying:und[i], token }));
   });
-  if (!list.length) throw new Error("hub reports " + n + " assets but no wrappers");
-  return { list, assetCount:n, noWrapper };
+  /* Zero wrappers is a legitimate state for a freshly listed hub, and with the RPC layer above
+     it can no longer be manufactured by a throttled batch. Render it, do not raise it. */
+  const result = { list, assetCount:n, noWrapper, shape };
+  DISCOVERED[h.key] = result;
+  return result;
 }
 
 /* Every read for one hub in two batched rounds: share decimals first, because the
    exchange rate has to be asked for in the wrapper's own units. */
 async function readHub(h) {
   const { rpcs } = CHAINS[h.chain], hub = h.addr;
-  const d = await discover(h);
+  const ctx = budget(HUB_BUDGET_MS);
+  const d = await discover(h, ctx);
   const L = d.list;
-  const shareDec = (await rpcBatch(rpcs, L.map(w => [w.spoke, SEL.decimals])))
-    .map((x, k) => { const v = Number(hexNum(x)); return (v > 0 && v <= 36) ? v : L[k].decimals; });
+  if (!L.length) return { block: parseInt(await rpc(rpcs, "eth_blockNumber", []), 16),
+                          rows: [], assetCount:d.assetCount, noWrapper:d.noWrapper };
+  const shareDec = (await rpcBatch(rpcs, L.map(w => [w.spoke, SEL.decimals]), ctx))
+    .map((x, k) => { const v = Number(hexNum(val(x))); return (v > 0 && v <= 36) ? v : L[k].decimals; });
   const calls = [];
   L.forEach((w, k) => calls.push(
     [hub,     SEL.config + u256(w.assetId) + addr(w.spoke)],
@@ -602,14 +692,14 @@ async function readHub(h) {
      read fails the Aave side must still render — buffer becomes null, shown as "unknown"
      rather than silently as "no buffer", which would be a claim we have not earned. */
   const [res, blockHex, buf] = await Promise.all([
-    rpcBatch(rpcs, calls),
-    rpc(rpcs, "eth_blockNumber", []),
+    rpcBatch(rpcs, calls, ctx),
+    rpc(rpcs, "eth_blockNumber", [], ctx),
     rpcBatch(rpcs, L.flatMap(w => [[BAL_VAULT, BUF.init + addr(w.spoke)],
-                                   [BAL_VAULT, BUF.balance + addr(w.spoke)]])).catch(() => null),
+                                   [BAL_VAULT, BUF.balance + addr(w.spoke)]]), ctx).catch(() => null),
   ]);
   const rows = L.map((w, k) => {
-    const [cfg, ta, md, cv] = res.slice(k * 4, k * 4 + 4);
-    if (!cfg || cfg.length < 2 + 5 * 64) return { ...w, hub:h.key, error:"config unreadable" };
+    const [cfg, ta, md, cv] = res.slice(k * 4, k * 4 + 4).map(val);
+    if (!cfg || cfg.length < 2 + 5 * 64) return { ...w, hub:h.key, error:"no config on this hub" };
     const word = i => hexNum("0x" + cfg.slice(2 + i * 64, 2 + (i + 1) * 64));
     const addCap = word(0), active = word(3) === 1n, halted = word(4) === 1n;
     const unit = 10 ** w.decimals;
@@ -620,7 +710,7 @@ async function readHub(h) {
     const disabled = addCap === 0n;
     const rate = cv && cv !== "0x" ? Number(hexNum(cv)) / unit : null;
     const pct = (capTokens && capTokens > 0) ? Math.min(100, 100 * supplied / capTokens) : null;
-    const bi = buf ? buf[k * 2] : null, bb = buf ? buf[k * 2 + 1] : null;
+    const bi = buf ? val(buf[k * 2]) : null, bb = buf ? val(buf[k * 2 + 1]) : null;
     const buffer = (bi && bi !== "0x") ? hexNum(bi) === 1n : null;
     let bufU = null, bufW = null;
     if (buffer && bb && bb.length >= 2 + 128) {
@@ -762,8 +852,10 @@ function hubErrHTML(h, msg) {
   return `<section class="block" aria-label="${label} ${h.name}">
     <div class="block-head"><div class="lhs"><span class="mark ${mark}"></span><h2>${label} · ${h.name}</h2></div>
       <span class="note">unavailable</span></div>
-    <div class="method">Could not read this hub — ${msg}. Public RPCs rate-limit bursts; press
-      <b>Refresh from chain</b> to retry. Nothing is cached, so no stale numbers are being shown for it.</div>
+    <div class="method">Could not read this hub — ${msg}. The page already retried across both
+      providers with backoff before giving up, so this is the public RPC being unavailable rather than a
+      transient blip; press <b>Refresh from chain</b> to try again. Nothing is cached, so no stale numbers
+      are shown for it — and a failed read is never reported as an empty hub.</div>
   </section>`;
 }
 
@@ -832,7 +924,12 @@ const btn = document.getElementById("refreshbtn");
 async function refresh() {
   btn.classList.add("loading"); btn.disabled = true;
   try {
-    const settled = await Promise.allSettled(HUBS.map(readHub));
+    /* Three at a time. The burst that tripped the rate limits was five hubs each posting an
+       80-call body; bodies are now capped at 20 and each hub has its own deadline, so the
+       remaining limit is just politeness toward a free endpoint. */
+    const settled = [];
+    for (let i = 0; i < HUBS.length; i += 3)
+      settled.push(...await Promise.allSettled(HUBS.slice(i, i + 3).map(readHub)));
     const all = {}, errs = {};
     HUBS.forEach((h, i) => {
       const s = settled[i];
