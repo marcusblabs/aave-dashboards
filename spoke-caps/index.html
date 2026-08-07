@@ -203,7 +203,7 @@
     border-radius: var(--radius); overflow: hidden; box-shadow: var(--card-shadow);
   }
   .row {
-    display: grid; grid-template-columns: 168px 1fr 148px 92px;
+    display: grid; grid-template-columns: 168px 1fr 148px 142px 92px;
     align-items: center; gap: 18px;
     padding: 13px 18px; border-top: 1px solid var(--border);
     transition: background .12s;
@@ -254,6 +254,16 @@
   .nums .cap { font-size: 10.5px; color: var(--text-mute); }
   .nums .avail { font-size: 11.5px; color: var(--text-mute); }
   .nums .avail b { font-weight: 600; color: var(--text-dim); }
+
+  /* supply APR — base, and the Merkl reward leg as a separate additive term */
+  .apr { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+  .apr[title] { cursor: help; }
+  .apr .tot { font-size: 13px; font-weight: 600; color: var(--text-dim); }
+  .apr .tot.boosted { color: var(--pos); }
+  .apr .split { font-size: 10.5px; color: var(--text-mute); margin-top: 1px; white-space: nowrap; }
+  .apr .split .inc { color: var(--primary-hov); font-weight: 600; }
+  .apr .ends { font-size: 10.5px; color: var(--text-mute); opacity: .75; white-space: nowrap; }
+  .apr .none { font-size: 11.5px; color: var(--text-mute); opacity: .75; }
 
   .pill {
     justify-self: end; font-family: var(--font-mono);
@@ -314,7 +324,8 @@
     .kpi-strip { grid-template-columns: repeat(2, 1fr); }
     .kpi { padding: 14px; } .kpi .val { font-size: 18px; }
     .shell { padding: 0 16px; }
-    .row { grid-template-columns: 1fr 104px; grid-template-areas: "name pill" "bar bar" "nums nums"; gap: 10px; }
+    .row { grid-template-columns: minmax(0,1fr) auto; grid-template-areas: "name pill" "bar bar" "nums apr"; gap: 10px; }
+    .apr { grid-area: apr; text-align: right; align-self: end; }
     .row .name { grid-area: name; } .barcell { grid-area: bar; }
     .nums { grid-area: nums; text-align: left; } .pill { grid-area: pill; justify-self: end; }
     .footer { padding: 12px 16px; }
@@ -407,10 +418,29 @@
           <code>getBufferBalance</code> for the depth behind it. Each row is badged <b>buffer live</b> or
           <b>no buffer</b>, and the <i>Pool-ready now</i> tile counts only wrappers where <b>both</b> sides are
           true. A Vault read that fails shows <b>buffer ?</b> rather than being reported as absent.</div>
+        <div><b>Supply APR is derived, not read.</b> <code>getAsset(assetId)</code> carries the <i>borrow</i>
+          rate, and handing that to a depositor overstates what they earn — by ~2x on Ethereum USDG and ~11x on
+          Avalanche USDC. What a lender receives is
+          <code>borrow × utilisation × (1 − reserve factor)</code>, and that is what the column shows,
+          cross-checked against realised <code>convertToAssets()</code> growth on the wrappers. It is a spot
+          rate that moves with utilisation every block, so treat it as a reading rather than a forecast; where
+          nothing is borrowed the row reads <b>no borrows</b>. The rate belongs to the hub asset, so a token's
+          two wrappers share it.</div>
+        <div><b>Reward legs are additive.</b> Where Merkl is running a campaign the row shows
+          <code>base + reward</code> and the headline is the <b>sum</b>. Merkl publishes the reward leg alone,
+          not a blended total — <code>dailyRewards × 365 ÷ TVL</code> reproduces its figure exactly, with no
+          base netted out — so reading its number as the whole yield understates it. Legs marked <b>up to</b>
+          are <code>MAX_APR</code>: paid against a fixed weekly budget, so they can land under target as TVL
+          grows. Campaigns run in weekly cycles and have so far renewed, so the date is the end of the current
+          cycle, not a cliff. Rewards are not always paid in the asset deposited — on Avalanche they pay in
+          WAVAX. Whether a particular integration receives <i>forwarded</i> rewards is a separate question this
+          page does not answer.</div>
         <div><b>How to read it.</b> Caps are governance-set per hub and per spoke. <b>Available</b> is the room
-          left before the cap, as the wrapper itself reports it. Bands: <b>open</b> under 40% filled,
-          <b>filling</b> 40–90%, <b>at cap</b> above 90%. A cap of <code>2^40−1</code> shows as
-          <b>uncapped</b>; a cap of 0 means the wrapper is deployed but closed to deposits.</div>
+          left before the cap, as the wrapper itself reports it — which is add-cap headroom on this spoke, not
+          exit liquidity and not absorbable size; the hub-side market behind a wrapper can be far larger. Bands:
+          <b>open</b> under 40% filled, <b>filling</b> 40–90%, <b>at cap</b> above 90%. A cap of
+          <code>2^40−1</code> shows as <b>uncapped</b>; a cap of 0 means the wrapper is deployed but closed to
+          deposits.</div>
         <div><b>Units.</b> Figures are in native token units, not dollars — stablecoins are ≈&nbsp;$1, but AVAX,
           BTC and ETH are not, so the headroom tile sums only the $-pegged wrappers. A token matching neither
           the dollar nor the non-dollar list is named in the status bar and left out of that total rather than
@@ -449,10 +479,10 @@
 const CHAINS = {
   /* Several providers per chain, because one free endpoint throttles a page that asks this
      many questions. Failed calls are retried against the next in the list before giving up. */
-  ethereum:  { label:"Ethereum",  mark:"eth",  explorer:"https://etherscan.io/address/",
+  ethereum:  { label:"Ethereum",  mark:"eth",  explorer:"https://etherscan.io/address/", chainId:1,
                rpcs:["https://ethereum-rpc.publicnode.com","https://eth.llamarpc.com",
                      "https://eth.drpc.org","https://rpc.ankr.com/eth","https://cloudflare-eth.com"] },
-  avalanche: { label:"Avalanche", mark:"avax", explorer:"https://snowscan.xyz/address/",
+  avalanche: { label:"Avalanche", mark:"avax", explorer:"https://snowscan.xyz/address/", chainId:43114,
                rpcs:["https://api.avax.network/ext/bc/C/rpc","https://avalanche-c-chain-rpc.publicnode.com",
                      "https://avalanche.drpc.org","https://rpc.ankr.com/avalanche"] },
 };
@@ -484,7 +514,8 @@ const BUF = { init:"0x6844846b", balance:"0x4021fe0f" };  /* isERC4626BufferInit
 const SEL = { config:"0xf701f06e", totalAssets:"0x01e1d114", maxDeposit:"0x402d267d",
               assetCount:"0xa0aead4d", underlyingAndDecimals:"0xde079b57",
               spokeCount:"0x58a54078", spokeAt:"0x132a8bea", symbol:"0x95d89b41",
-              decimals:"0x313ce567", convertToAssets:"0x07a2d13a" };
+              decimals:"0x313ce567", convertToAssets:"0x07a2d13a", asset:"0xeac8f5b8" };
+const RAY = 1e27;
 const DEAD = "000000000000000000000000000000000000000000000000000000000000dead";
 const MAX_CAP = (1n << 40n) - 1n;
 
@@ -671,6 +702,77 @@ async function discover(h, ctx) {
   return result;
 }
 
+/* What a depositor actually earns. getAsset() carries the BORROW rate in word 10, not the
+   supply rate — handing that number straight to a lender overstates it by utilisation and the
+   reserve factor, which on this hub set ranges from ~2x to ~11x. Derive it instead, and check
+   the result against realised convertToAssets() growth before believing it. */
+function supplyRate(hex, decimals) {
+  if (!hex || hex === "0x" || hex.length < 2 + 12 * 64) return null;
+  const w = i => Number(hexNum("0x" + hex.slice(2 + i * 64, 2 + (i + 1) * 64)));
+  const unit = 10 ** decimals;
+  const borrow = w(10) / RAY;
+  const idle   = w(0) / unit;
+  const debt   = (w(6) / unit) * (w(9) / RAY);
+  const rf     = w(8) / 10000;
+  const pool   = debt + idle;
+  const util   = pool > 0 ? debt / pool : 0;
+  if (!isFinite(borrow) || !isFinite(util)) return null;
+  return { base: borrow * util * (1 - rf) * 100, util: util * 100,
+           rf: rf * 100, borrowRate: borrow * 100, hasDebt: debt > 0 };
+}
+
+/* Merkl reward legs. One fetch per chain, shared by that chain's hubs, cleared on refresh.
+   The API is a nice-to-have: a failure here must leave the caps rendering, and is surfaced in
+   the sources bar rather than passed off as "no campaign". */
+const MERKL = {};
+function merklFor(chain) {
+  if (!MERKL[chain]) MERKL[chain] = fetchMerkl(chain).catch(e => ({ err:String((e && e.message) || e) }));
+  return MERKL[chain];
+}
+async function fetchMerkl(chain) {
+  const cid = CHAINS[chain].chainId;
+  const j = async u => { const r = await fetch(u); if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); };
+  const ops = [];
+  for (let page = 0; page < 3; page++) {
+    const d = await j(`https://api.merkl.xyz/v4/opportunities?chainId=${cid}&items=100&page=${page}&status=LIVE`);
+    if (!Array.isArray(d) || !d.length) break;
+    ops.push(...d.filter(o => String(o.type) === "AAVE_V4_HUB_NET_LENDING"));
+    if (d.length < 100) break;
+  }
+  const out = [];
+  await Promise.all(ops.map(async o => {
+    const camps = ((o.aprRecord || {}).breakdowns || []).filter(b => b.type === "CAMPAIGN");
+    await Promise.all(camps.map(async b => {
+      let c;
+      try { c = await j(`https://api.merkl.xyz/v4/campaigns?chainId=${cid}&campaignId=${b.identifier}`); }
+      catch (e) { return; }
+      c = Array.isArray(c) ? c[0] : c;
+      if (!c) return;
+      const p  = c.params || {};
+      const dm = p.distributionMethodParameters || {};
+      const ds = dm.distributionSettings || {};
+      if (ds.side && String(ds.side) !== "supply") return;
+      const apr = Number(b.value != null ? b.value : o.apr);
+      if (!isFinite(apr) || apr <= 0) return;
+      /* MAX_APR pays only up to a target against a fixed weekly budget, so it can land under
+         target as TVL grows; FIX_APR is a flat add-on. Both are the reward leg ALONE. */
+      const capped = String(ds.mode || "") === "MAX_APR" || ds.targetAPR != null;
+      const meta = { apr, capped, end:Number(c.endTimestamp || 0), reward:p.symbolRewardToken || "",
+                     name:o.name || "" };
+      if (ds.hubAddress && ds.assetId != null) {
+        out.push({ ...meta, hub:String(ds.hubAddress).toLowerCase(), ids:[Number(ds.assetId)] });
+      } else {
+        (p.hubs || []).forEach(hh => {
+          const ids = (hh.lendingAssetIds || []).map(Number).filter(isFinite);
+          if (hh.hubAddress && ids.length)
+            out.push({ ...meta, hub:String(hh.hubAddress).toLowerCase(), ids });
+        });
+      }
+    }));
+  }));
+  return out;
+}
+
 /* Every read for one hub in two batched rounds: share decimals first, because the
    exchange rate has to be asked for in the wrapper's own units. */
 async function readHub(h) {
@@ -691,12 +793,32 @@ async function readHub(h) {
   /* Balancer buffer state is a separate contract, so it gets its own batch. If the Vault
      read fails the Aave side must still render — buffer becomes null, shown as "unknown"
      rather than silently as "no buffer", which would be a claim we have not earned. */
-  const [res, blockHex, buf] = await Promise.all([
+  /* The rate lives on the ASSET, not the wrapper, so ask once per assetId — three Global Dollar
+     assets carry two wrappers each and would otherwise be queried twice for the same answer. */
+  const assetIds = [...new Set(L.map(w => w.assetId))];
+  const decOf = {}; L.forEach(w => { decOf[w.assetId] = w.decimals; });
+  const [res, blockHex, buf, assetRes, merkl] = await Promise.all([
     rpcBatch(rpcs, calls, ctx),
     rpc(rpcs, "eth_blockNumber", [], ctx),
     rpcBatch(rpcs, L.flatMap(w => [[BAL_VAULT, BUF.init + addr(w.spoke)],
                                    [BAL_VAULT, BUF.balance + addr(w.spoke)]]), ctx).catch(() => null),
+    rpcBatch(rpcs, assetIds.map(i => [hub, SEL.asset + u256(i)]), ctx).catch(() => null),
+    merklFor(h.chain),
   ]);
+  const rateBy = {};
+  if (assetRes) assetIds.forEach((id, k) => {
+    const r = supplyRate(val(assetRes[k]), decOf[id]);
+    if (r) rateBy[id] = r;
+  });
+  /* Campaigns are keyed by hub as well as asset: the same token is incentivised at different
+     rates on different hubs, so matching on assetId alone would cross-post them. */
+  const merklErr = (merkl && merkl.err) ? merkl.err : null;
+  const incBy = {};
+  if (Array.isArray(merkl)) merkl.filter(c => c.hub === hub.toLowerCase())
+    .forEach(c => c.ids.forEach(id => {
+      const prev = incBy[id];
+      if (!prev || c.end > prev.end) incBy[id] = c;
+    }));
   const rows = L.map((w, k) => {
     const [cfg, ta, md, cv] = res.slice(k * 4, k * 4 + 4).map(val);
     if (!cfg || cfg.length < 2 + 5 * 64) return { ...w, hub:h.key, error:"no config on this hub" };
@@ -718,7 +840,8 @@ async function readHub(h) {
       bufW = Number(hexNum("0x" + bb.slice(2 + 64, 2 + 128))) / unit;
     }
     return { ...w, hub:h.key, addCap:capTokens, supplied, available, pct, rate,
-             active, halted, uncapped, disabled, buffer, bufU, bufW };
+             active, halted, uncapped, disabled, buffer, bufU, bufW,
+             ...(rateBy[w.assetId] || {}), incentive: incBy[w.assetId] || null };
   });
   /* A count alone cannot be rendered usefully — "1 of 2" is identical on both wrappers and
      tells you neither which one you are looking at nor what the other is. Attach the actual
@@ -732,7 +855,7 @@ async function readHub(h) {
            : x.halted ? "halted" : !x.active ? "inactive"
            : x.uncapped ? "uncapped" : "cap " + fmt(x.addCap, x.decimals) }));
   });
-  return { block: parseInt(blockHex, 16), rows, assetCount:d.assetCount, noWrapper:d.noWrapper };
+  return { block: parseInt(blockHex, 16), rows, assetCount:d.assetCount, noWrapper:d.noWrapper, merklErr };
 }
 
 function fmt(x, dp) {
@@ -780,6 +903,33 @@ function bufBadge(r) {
   return `<span class="buf yes" title="ERC-4626 buffer initialised on the Balancer v3 Vault${depth}">buffer live</span>`;
 }
 
+/* Base and reward are shown as separate terms because they behave differently: base floats with
+   utilisation every block, the reward leg is a weekly campaign that can stop. Merkl publishes the
+   reward ALONE, so the headline here is the sum — never Merkl's number on its own. */
+function aprHTML(r) {
+  if (r.base == null) return `<div class="apr"><span class="none">—</span></div>`;
+  const p = x => x.toFixed(2) + "%";
+  const util = ` Utilisation ${r.util.toFixed(1)}%, reserve factor ${r.rf.toFixed(0)}%.`;
+  const inc = r.incentive;
+  if (!inc) {
+    const why = r.hasDebt ? "base only" : "no borrows";
+    return `<div class="apr" title="Supply APR on the hub asset, derived from the borrow rate.${util}${
+      r.hasDebt ? "" : " Nothing is borrowed, so deposits earn nothing."}">
+      <div class="tot">${p(r.base)}</div><div class="split">${why}</div></div>`;
+  }
+  const total = r.base + inc.apr;
+  const ends = inc.end ? new Date(inc.end * 1000).toLocaleDateString("en-US", { month:"short", day:"numeric" }) : "";
+  const upTo = inc.capped ? "up to " : "";
+  return `<div class="apr" title="${p(r.base)} supply APR plus a Merkl reward leg of ${upTo}${p(inc.apr)}${
+      inc.reward ? " paid in " + inc.reward : ""}. The reward is additive, not a blended total.${util}${
+      inc.capped ? " Capped against a weekly budget, so it can land under target as TVL grows." : ""}${
+      ends ? " Current cycle ends " + ends + "." : ""}">
+    <div class="tot boosted">${p(total)}</div>
+    <div class="split">${p(r.base)} + <span class="inc">${upTo}${p(inc.apr)}</span></div>
+    ${ends ? `<div class="ends">cycle to ${ends}</div>` : ""}
+  </div>`;
+}
+
 function rowHTML(r) {
   const short = r.spoke.slice(0,6) + "…" + r.spoke.slice(-4);
   const st = statusText(r);
@@ -789,6 +939,7 @@ function rowHTML(r) {
         <span class="addr" data-a="${r.spoke}" title="${r.spoke}">${short}</span></div></div>
       <div class="barcell"><div class="capbar empty"></div></div>
       <div class="nums"><div class="cap">${r.error}</div></div>
+      <div class="apr"></div>
       <span class="pill err">error</span></div>`;
   }
   const b = band(r.pct || 0);
@@ -810,6 +961,7 @@ function rowHTML(r) {
       <div class="cap">${capTxt}</div>
       <div class="avail">avail <b>${fmt(r.available, r.decimals)}</b></div>
     </div>
+    ${aprHTML(r)}
     <span class="pill ${st.cls}">${st.txt}</span>
   </div>`;
 }
@@ -906,6 +1058,15 @@ function paintSources(all, errs, t) {
     + `<span class="src"><span class="sdot live"></span>${
         [].concat(...okKeys.map(k => all[k].rows)).filter(r => r.buffer === true).length
       } wrappers have a Balancer v3 buffer</span>`
+    + (() => {
+        /* A campaign feed that failed must not read as "no campaigns are running". */
+        const bad = okKeys.filter(k => all[k].merklErr);
+        const boosted = [].concat(...okKeys.map(k => all[k].rows)).filter(r => r.incentive).length;
+        if (bad.length) return `<span class="src"><span class="sdot err"></span>Merkl reward data unavailable — ${
+          all[bad[0]].merklErr} · APR shown is base only</span>`;
+        return `<span class="src"><span class="sdot live"></span>${boosted} wrapper${
+          boosted === 1 ? " has" : "s have"} a live Merkl reward leg, shown on top of base</span>`;
+      })()
     + `<span class="src"><span class="sdot live"></span>deposit side only — borrow caps are not shown</span>`;
 }
 
@@ -923,6 +1084,7 @@ document.addEventListener("click", e => {
 const btn = document.getElementById("refreshbtn");
 async function refresh() {
   btn.classList.add("loading"); btn.disabled = true;
+  for (const k in MERKL) delete MERKL[k];   /* campaigns change weekly — never serve a cached leg */
   try {
     /* Three at a time. The burst that tripped the rate limits was five hubs each posting an
        80-call body; bodies are now capped at 20 and each hub has its own deadline, so the
