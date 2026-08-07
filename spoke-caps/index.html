@@ -426,15 +426,19 @@
           rate that moves with utilisation every block, so treat it as a reading rather than a forecast; where
           nothing is borrowed the row reads <b>no borrows</b>. The rate belongs to the hub asset, so a token's
           two wrappers share it.</div>
-        <div><b>Reward legs are additive.</b> Where Merkl is running a campaign the row shows
-          <code>base + reward</code> and the headline is the <b>sum</b>. Merkl publishes the reward leg alone,
-          not a blended total — <code>dailyRewards × 365 ÷ TVL</code> reproduces its figure exactly, with no
-          base netted out — so reading its number as the whole yield understates it. Legs marked <b>up to</b>
-          are <code>MAX_APR</code>: paid against a fixed weekly budget, so they can land under target as TVL
-          grows. Campaigns run in weekly cycles and have so far renewed, so the date is the end of the current
-          cycle, not a cliff. Rewards are not always paid in the asset deposited — on Avalanche they pay in
-          WAVAX. Whether a particular integration receives <i>forwarded</i> rewards is a separate question this
-          page does not answer.</div>
+        <div><b>Most reward legs are a top-up, not a bonus.</b> Aave's campaigns are
+          <code>AAVE_V4_NET_APR</code>: Merkl tops a position up to a <i>net</i> target, so the <b>total is
+          pinned</b> and the reward leg is only the residual after base — it shrinks as base rises rather than
+          stacking on top. Two USDG markets prove it: Core sits on a 1.24% base and Global Dollar on 0.61%, and
+          both land on the same <b>6.18%</b> total, because 6.00% APR compounded weekly is 6.18% APY. A
+          <code>FIX_APR</code> campaign is the other kind and genuinely does add on top; Avalanche USDT is the
+          only one live today. Merkl's own <code>apr</code> field is neither figure — it measures emissions over
+          the reward-eligible TVL, which is smaller than the market, so it reads 6% on the campaign Aave shows
+          as 4.94%. This page uses the campaign's target and derives the rest, which reproduces Aave's numbers
+          exactly. Cycles are weekly and have so far renewed, so the date is the end of the current one, not a
+          cliff. Rewards are not always paid in the asset deposited — on Avalanche they pay in WAVAX. Whether a
+          particular integration receives <i>forwarded</i> rewards is a separate question this page does not
+          answer.</div>
         <div><b>How to read it.</b> Caps are governance-set per hub and per spoke. <b>Available</b> is the room
           left before the cap, as the wrapper itself reports it — which is add-cap headroom on this spoke, not
           exit liquidity and not absorbable size; the hub-side market behind a wrapper can be far larger. Bands:
@@ -752,12 +756,18 @@ async function fetchMerkl(chain) {
       const dm = p.distributionMethodParameters || {};
       const ds = dm.distributionSettings || {};
       if (ds.side && String(ds.side) !== "supply") return;
-      const apr = Number(b.value != null ? b.value : o.apr);
-      if (!isFinite(apr) || apr <= 0) return;
-      /* MAX_APR pays only up to a target against a fixed weekly budget, so it can land under
-         target as TVL grows; FIX_APR is a flat add-on. Both are the reward leg ALONE. */
-      const capped = String(ds.mode || "") === "MAX_APR" || ds.targetAPR != null;
-      const meta = { apr, capped, end:Number(c.endTimestamp || 0), reward:p.symbolRewardToken || "",
+      /* Two different contracts, and confusing them misstates the yield badly.
+         AAVE_V4_NET_APR / MAX_APR tops the position UP TO a net target: the total is pinned
+         and the reward is whatever is left after base, so it shrinks as base rises. FIX_APR
+         pays a flat rate regardless of base, and only that one is additive.
+         Merkl's own `apr` field is neither — it is the emission measured over the
+         reward-eligible TVL, which is smaller than the market, so it reads ~6% on a campaign
+         that Aave correctly shows as 4.94%. Do not use it for the net case. */
+      const net = String(ds.mode || "") === "MAX_APR" || ds.targetAPR != null;
+      const rate = net ? Number(ds.targetAPR) * 100
+                       : (ds.apr != null ? Number(ds.apr) * 100 : Number(b.value != null ? b.value : o.apr));
+      if (!isFinite(rate) || rate <= 0) return;
+      const meta = { rate, net, end:Number(c.endTimestamp || 0), reward:p.symbolRewardToken || "",
                      name:o.name || "" };
       if (ds.hubAddress && ds.assetId != null) {
         out.push({ ...meta, hub:String(ds.hubAddress).toLowerCase(), ids:[Number(ds.assetId)] });
@@ -903,9 +913,12 @@ function bufBadge(r) {
   return `<span class="buf yes" title="ERC-4626 buffer initialised on the Balancer v3 Vault${depth}">buffer live</span>`;
 }
 
-/* Base and reward are shown as separate terms because they behave differently: base floats with
-   utilisation every block, the reward leg is a weekly campaign that can stop. Merkl publishes the
-   reward ALONE, so the headline here is the sum — never Merkl's number on its own. */
+/* Aave states the reward leg net of base and compounds it weekly, so the two USDG markets
+   below land on an identical 6.18% total off different bases (1.24% and 0.61%). Reproducing
+   that is the whole point of splitting net from flat here — the naive "base + campaign rate"
+   overstated Core USDG as 7.24% against Aave's 6.18%. */
+const weeklyAPY = aprPct => ((1 + aprPct / 100 / 52) ** 52 - 1) * 100;
+
 function aprHTML(r) {
   if (r.base == null) return `<div class="apr"><span class="none">—</span></div>`;
   const p = x => x.toFixed(2) + "%";
@@ -917,15 +930,18 @@ function aprHTML(r) {
       r.hasDebt ? "" : " Nothing is borrowed, so deposits earn nothing."}">
       <div class="tot">${p(r.base)}</div><div class="split">${why}</div></div>`;
   }
-  const total = r.base + inc.apr;
+  /* net: the campaign guarantees the TOTAL, so the reward is the residual and falls as base
+     rises. flat: the campaign pays its rate on top whatever base does. */
+  const total  = inc.net ? weeklyAPY(inc.rate) : r.base + inc.rate;
+  const reward = Math.max(0, total - r.base);
   const ends = inc.end ? new Date(inc.end * 1000).toLocaleDateString("en-US", { month:"short", day:"numeric" }) : "";
-  const upTo = inc.capped ? "up to " : "";
-  return `<div class="apr" title="${p(r.base)} supply APR plus a Merkl reward leg of ${upTo}${p(inc.apr)}${
-      inc.reward ? " paid in " + inc.reward : ""}. The reward is additive, not a blended total.${util}${
-      inc.capped ? " Capped against a weekly budget, so it can land under target as TVL grows." : ""}${
+  const how = inc.net
+    ? `Merkl tops this position up to a net ${p(inc.rate)} APR, which is ${p(total)} APY compounded weekly. The reward leg is the residual after base, so it shrinks as base rises rather than stacking on top.`
+    : `Merkl pays a flat ${p(inc.rate)} on top of base, whatever base does.`;
+  return `<div class="apr" title="${how} Reward paid in ${inc.reward || "the campaign token"}.${util}${
       ends ? " Current cycle ends " + ends + "." : ""}">
     <div class="tot boosted">${p(total)}</div>
-    <div class="split">${p(r.base)} + <span class="inc">${upTo}${p(inc.apr)}</span></div>
+    <div class="split">${p(r.base)} + <span class="inc">${p(reward)}</span></div>
     ${ends ? `<div class="ends">cycle to ${ends}</div>` : ""}
   </div>`;
 }
